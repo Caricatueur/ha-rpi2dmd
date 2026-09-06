@@ -1,5 +1,7 @@
 # RPI2DMD Home Assistant Integration
 
+![RPI2DMD connected with Home Assistant](custom_components/rpi2dmd/frontend/assets/rpi2dmd-ha-logo.png)
+
 Native Home Assistant integration for the local RPI2DMD V2.8 REST API.
 
 ## HA-3 initial version
@@ -43,3 +45,6 @@ Playlist editing, MQTT configuration, GIF metadata and configuration
 export/import use the already validated RPI2DMD API routes through the existing
 integration client. The panel is a native dependency-free Web Component and
 requires no Node.js or frontend build step.
+
+The panel uses this local branding asset for its responsive hero header; no
+CDN or external image resource is required.
