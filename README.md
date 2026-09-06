@@ -1,6 +1,8 @@
 # RPI2DMD Home Assistant Integration
 
-![RPI2DMD connected with Home Assistant](custom_components/rpi2dmd/frontend/assets/rpi2dmd-ha-logo.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Caricatueur/ha-rpi2dmd/main/assets/rpi2dmd-ha-logo.png" alt="RPI2DMD connecté à Home Assistant" width="72">
+</p>
 
 Native Home Assistant integration for the local RPI2DMD V2.8 REST API.
 
