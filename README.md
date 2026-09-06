@@ -4,7 +4,7 @@
 
 Native Home Assistant integration for the local RPI2DMD V2.8 REST API.
 
-## HA-3 initial version
+## initial version
 
 This development version provides:
 
