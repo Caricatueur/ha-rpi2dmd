@@ -64,7 +64,14 @@ class Rpi2dmdPanel extends HTMLElement {
       this._render();
     } catch (err) { this._showError(err); }
   }
-  _showError(err) { this._error = err?.message || "RPI2DMD indisponible"; this._render(); }
+  _showError(err) {
+    const message = err?.message || "";
+    console.error("RPI2DMD Home Assistant WebSocket error", message);
+    this._error = /unknown command/i.test(message)
+      ? "Erreur Home Assistant : commande RPI2DMD indisponible."
+      : (message || "RPI2DMD indisponible");
+    this._render();
+  }
   _clearError() { this._error = ""; }
   async _updateDisplay(changes) {
     if (this._busy) return;
