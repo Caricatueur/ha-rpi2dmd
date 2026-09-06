@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -82,9 +83,15 @@ class RPI2DMDClient:
                         except (ValueError, TypeError):
                             message = "API error"
                         raise RPI2DMDHTTPError(response.status, str(message))
+                    # Mutation endpoints may legitimately return 204 (or an
+                    # empty 200/201 body). Do not require JSON when the HTTP
+                    # contract intentionally has no response document.
+                    raw = await response.read()
+                    if not raw.strip():
+                        return {}
                     try:
-                        payload = await response.json(content_type=None)
-                    except (ValueError, TypeError) as err:
+                        payload = json.loads(raw.decode(response.charset or "utf-8"))
+                    except (UnicodeDecodeError, ValueError, TypeError) as err:
                         raise RPI2DMDError("Invalid JSON response") from err
                     if not isinstance(payload, dict) or payload.get("ok") is not True:
                         raise RPI2DMDError("Malformed API response")
