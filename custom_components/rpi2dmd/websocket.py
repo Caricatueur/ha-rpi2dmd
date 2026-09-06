@@ -6,9 +6,10 @@ headers remain inside the integration's existing client objects.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Mapping
 from typing import Any
 
+import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 
@@ -115,10 +116,8 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
     raise ValueError("Unknown RPI2DMD WebSocket command")
 
 
-@websocket_api.websocket_command({"type": str, "id": int})
-@websocket_api.async_response
-async def websocket_handler(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
-    """Dispatch a panel command through the existing API client."""
+async def _websocket_handler(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
+    """Dispatch one of the registered panel commands."""
     try:
         result = await _call(hass, msg)
     except (RPI2DMDError, ValueError, KeyError, TypeError) as err:
@@ -127,9 +126,58 @@ async def websocket_handler(hass: HomeAssistant, connection, msg: dict[str, Any]
     connection.send_result(msg["id"], result)
 
 
+WEBSOCKET_COMMANDS = (
+    "rpi2dmd/devices",
+    "rpi2dmd/status",
+    "rpi2dmd/display/get",
+    "rpi2dmd/display/update",
+    "rpi2dmd/playlist/get",
+    "rpi2dmd/playlist/add",
+    "rpi2dmd/playlist/update",
+    "rpi2dmd/playlist/delete",
+    "rpi2dmd/playlist/move",
+    "rpi2dmd/playlist/duplicate",
+    "rpi2dmd/mqtt/get",
+    "rpi2dmd/mqtt/update",
+    "rpi2dmd/mqtt/test",
+    "rpi2dmd/gifs/list",
+    "rpi2dmd/gifs/categories",
+    "rpi2dmd/weather/get",
+    "rpi2dmd/weather/update",
+    "rpi2dmd/system",
+    "rpi2dmd/config/export",
+    "rpi2dmd/config/import/validate",
+    "rpi2dmd/config/import/apply",
+)
+
+
+def _command_handler(command: str):
+    """Build a handler with a literal WebSocket command schema.
+
+    Home Assistant indexes registered handlers by the literal value of the
+    schema's ``type`` field. A generic ``str`` validator is not a command
+    registration for any concrete message type.
+    """
+
+    @websocket_api.websocket_command(
+        vol.All(
+            vol.Schema(
+                {vol.Required("type"): command, vol.Required("id"): int},
+                extra=vol.ALLOW_EXTRA,
+            )
+        )
+    )
+    @websocket_api.async_response
+    async def handler(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
+        await _websocket_handler(hass, connection, msg)
+
+    return handler
+
+
 def async_register(hass: HomeAssistant) -> None:
     """Register the single WebSocket command dispatcher once."""
     if hass.data.get("rpi2dmd_websocket_registered"):
         return
-    websocket_api.async_register_command(hass, websocket_handler)
+    for command in WEBSOCKET_COMMANDS:
+        websocket_api.async_register_command(hass, _command_handler(command))
     hass.data["rpi2dmd_websocket_registered"] = True
