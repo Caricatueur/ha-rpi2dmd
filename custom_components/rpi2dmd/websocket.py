@@ -7,6 +7,7 @@ headers remain inside the integration's existing client objects.
 from __future__ import annotations
 
 from collections.abc import Mapping
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -16,16 +17,38 @@ from homeassistant.core import HomeAssistant
 from .api import RPI2DMDAuthError, RPI2DMDConnectionError, RPI2DMDError
 from .const import DOMAIN
 
+_LOGGER = logging.getLogger(__name__)
+
 
 def _entries(hass: HomeAssistant):
     return hass.config_entries.async_entries(DOMAIN)
 
 
+def _runtimes(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
+    """Return only loaded config-entry runtimes.
+
+    Keep this filtering local to the WebSocket bridge so technical metadata
+    accidentally stored alongside entry data can never be treated as a
+    device. The HA-3 entity platforms continue to use their existing layout.
+    """
+    domain_data = hass.data.get(DOMAIN, {})
+    if not isinstance(domain_data, Mapping):
+        return {}
+    return {
+        entry_id: runtime
+        for entry_id, runtime in domain_data.items()
+        if isinstance(entry_id, str)
+        and isinstance(runtime, Mapping)
+        and "api" in runtime
+        and "coordinator" in runtime
+    }
+
+
 def _runtime(hass: HomeAssistant, entry_id: str) -> dict[str, Any]:
-    runtime = hass.data.get(DOMAIN, {}).get(entry_id)
+    runtime = _runtimes(hass).get(entry_id)
     if not runtime:
         raise ValueError("RPI2DMD config entry is not loaded")
-    return runtime
+    return dict(runtime)
 
 
 def _entry_id(msg: Mapping[str, Any]) -> str:
@@ -51,16 +74,20 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
     command = msg["type"]
     if command == "rpi2dmd/devices":
         result = []
+        runtimes = _runtimes(hass)
         for entry in _entries(hass):
-            runtime = hass.data.get(DOMAIN, {}).get(entry.entry_id)
-            info = runtime["coordinator"].info if runtime else {}
+            runtime = runtimes.get(entry.entry_id)
+            coordinator = runtime.get("coordinator") if runtime else None
+            info = getattr(coordinator, "info", {})
+            if not isinstance(info, Mapping):
+                info = {}
             result.append(
                 {
                     "entry_id": entry.entry_id,
-                    "name": entry.title or info.get("hostname") or "RPI2DMD",
+                    "name": getattr(entry, "title", None) or info.get("hostname") or "RPI2DMD",
                     "model": info.get("model"),
                     "host": entry.data.get("host"),
-                    "available": bool(runtime and runtime["coordinator"].available),
+                    "available": bool(coordinator and getattr(coordinator, "available", False)),
                 }
             )
         return {"devices": result}
@@ -122,6 +149,10 @@ async def _websocket_handler(hass: HomeAssistant, connection, msg: dict[str, Any
         result = await _call(hass, msg)
     except (RPI2DMDError, ValueError, KeyError, TypeError) as err:
         _send_error(connection, msg["id"], err)
+        return
+    except Exception as err:  # pragma: no cover - defensive HA boundary
+        _LOGGER.exception("RPI2DMD WebSocket command %s failed", msg.get("type"))
+        connection.send_error(msg["id"], "unknown_error", "RPI2DMD command failed")
         return
     connection.send_result(msg["id"], result)
 
