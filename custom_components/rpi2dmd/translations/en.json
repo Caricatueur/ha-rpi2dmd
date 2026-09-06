@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add RPI2DMD",
+        "description": "Connect to the RPI2DMD V2.8 API.",
+        "data": {
+          "host": "RPI2DMD address",
+          "token": "API token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to RPI2DMD",
+      "invalid_auth": "Invalid API token",
+      "unsupported_version": "Unsupported RPI2DMD version",
+      "unknown": "Unexpected RPI2DMD response"
+    },
+    "abort": {
+      "already_configured": "This RPI2DMD is already configured"
+    }
+  }
+}
