@@ -1,0 +1,7 @@
+{
+  "name": "RPI2DMD",
+  "content_in_root": false,
+  "render_readme": true,
+  "domains": ["rpi2dmd"],
+  "homeassistant": "2024.1.0"
+}
