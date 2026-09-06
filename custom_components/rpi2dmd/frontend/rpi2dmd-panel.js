@@ -1,6 +1,17 @@
 /* RPI2DMD HA-4 panel: dependency-free Web Component.
  * All Raspberry communication goes through hass.callWS; no token or API URL
  * is ever present in this browser code. */
+const RPI_POLISH_CSS = `
+  *{box-sizing:border-box}:host{--rpi-blue:#03a9f4;--rpi-cyan:#22d3ee;--rpi-purple:#a855f7}
+  main{max-width:1280px;padding:28px clamp(16px,3vw,42px) 48px}
+  .hero{position:relative;overflow:hidden;min-height:255px;border:1px solid color-mix(in srgb,var(--divider-color) 65%,transparent);border-radius:24px;background:linear-gradient(120deg,#080b12 0%,#111827 52%,#102b47 100%);box-shadow:0 18px 48px rgba(0,0,0,.22);isolation:isolate}
+  .hero:after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 84% 35%,rgba(34,211,238,.28),transparent 33%),linear-gradient(90deg,rgba(0,0,0,.2),transparent 60%);z-index:-1;pointer-events:none}
+  .hero-banner{position:absolute;inset:0 0 0 auto;width:64%;background-image:linear-gradient(90deg,#080b12 0%,rgba(8,11,18,.78) 15%,transparent 48%),url('/rpi2dmd-assets/rpi2dmd-ha-logo.png');background-size:cover;background-position:center 44%;opacity:.82;z-index:-1}
+  .hero-content{position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;min-height:255px;padding:30px clamp(22px,4vw,48px)}
+  .eyebrow{margin:0 0 8px;color:#67e8f9;font-size:.74rem;font-weight:800;letter-spacing:.2em}.hero h1{margin:0;color:#fff;font-size:clamp(2.1rem,5vw,4rem);letter-spacing:-.045em;line-height:1}.hero .sub{margin:.65rem 0 0;color:#cbd5e1}.hero-meta{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}.online-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid rgba(103,232,249,.35);border-radius:999px;background:rgba(8,47,73,.72);color:#cffafe;font-weight:700;font-size:.84rem;white-space:nowrap}.online-pill i{display:block;width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 13px #34d399}.device{font-weight:700}
+  .metric-card{position:relative;overflow:hidden}.metric-card:after{content:"";position:absolute;width:100px;height:100px;right:-38px;bottom:-42px;border-radius:50%;background:rgba(34,211,238,.1)}.metric-head{display:flex;align-items:center;gap:9px}.metric-head h2{margin:0;color:var(--secondary-text-color);font-size:.78rem;letter-spacing:.1em}.metric-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,rgba(34,211,238,.2),rgba(168,85,247,.2));color:var(--rpi-blue);font-weight:800}.card{border-radius:18px;box-shadow:0 8px 26px rgba(0,0,0,.08)}.card strong{margin:16px 0 5px;letter-spacing:-.025em}.nav{border:1px solid var(--divider-color);border-radius:10px;box-shadow:none;font-weight:650;transition:all .16s ease}.nav.active{background:linear-gradient(135deg,var(--rpi-blue),var(--rpi-purple));box-shadow:0 5px 18px rgba(59,130,246,.3)}button{border-radius:10px;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}button:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 7px 18px rgba(3,169,244,.25)}.category-card,.schedule-row{background:color-mix(in srgb,var(--secondary-background-color) 65%,transparent);border-radius:12px}.disabled-item{opacity:.58}.warning{border:1px solid rgba(245,158,11,.45);border-radius:14px;background:linear-gradient(110deg,rgba(245,158,11,.2),rgba(239,68,68,.12));font-weight:700}.controls input[type=range]{accent-color:var(--rpi-blue)}
+  @media(max-width:700px){main{padding:16px 12px 34px}.hero{min-height:330px}.hero-banner{width:100%;height:56%;inset:auto 0 0;background-image:linear-gradient(180deg,#080b12 0%,rgba(8,11,18,.15) 55%),url('/rpi2dmd-assets/rpi2dmd-ha-logo.png');background-position:center 42%;opacity:.65}.hero-content{align-items:flex-start;flex-direction:column;justify-content:space-between;min-height:330px;padding:24px 20px}.hero-meta{width:100%;align-items:stretch;flex-direction:column}.device{width:100%;justify-content:space-between}.device select{flex:1;min-width:0}.item,.schedule-row,.category-card{align-items:flex-start;flex-direction:column}.actions{width:100%}nav{padding-top:13px}}
+`;
 class Rpi2dmdPanel extends HTMLElement {
   constructor() {
     super();
@@ -89,9 +100,8 @@ class Rpi2dmdPanel extends HTMLElement {
   _render() {
     if (!this.shadowRoot) return;
     const device = this._devices.find(d => d.entry_id === this._entry);
-    this.shadowRoot.innerHTML = `<style>${this._css()}</style><main>
-      <header><div class="brand"><img src="/rpi2dmd-assets/rpi2dmd-ha-logo.png" alt="RPI2DMD" class="logo"><div><h1>RPI2DMD</h1><p class="sub">${this._esc(device?.model || "RPI2DMD")}</p></div></div>
-      <label class="device">Appareil <select id="device">${this._devices.map(d => `<option value="${this._esc(d.entry_id)}" ${d.entry_id===this._entry?"selected":""}>${this._esc(this._deviceLabel(d))}</option>`).join("")}</select></label></header>
+    this.shadowRoot.innerHTML = `<style>${this._css()}${RPI_POLISH_CSS}</style><main>
+      <header class="hero"><div class="hero-banner" role="img" aria-label="RPI2DMD connecté à Home Assistant"></div><div class="hero-content"><div><p class="eyebrow">HOME ASSISTANT · RPI2DMD</p><h1>RPI2DMD</h1><p class="sub">${this._esc(device?.model || "Raspberry Pi DMD")}</p></div><div class="hero-meta"><span class="online-pill"><i></i> ${this._status ? "En ligne" : "Connexion…"}</span><label class="device">Appareil <select id="device">${this._devices.map(d => `<option value="${this._esc(d.entry_id)}" ${d.entry_id===this._entry?"selected":""}>${this._esc(this._deviceLabel(d))}</option>`).join("")}</select></label></div></div></header>
       <nav aria-label="Navigation">${["dashboard","display","brightness","playlist","mqtt","gif","weather","system","backup"].map(s => `<button class="nav ${this._section===s?"active":""}" data-nav="${s}">${this._label(s)}</button>`).join("")}</nav>
       ${this._error ? `<div class="error" role="alert">${this._esc(this._error)} <button data-action="retry">Réessayer</button></div>` : ""}
       ${this._content()}
@@ -115,10 +125,10 @@ class Rpi2dmdPanel extends HTMLElement {
     if (this._section === "system") return this._systemPage();
     return this._backupPage();
   }
-  _card(title, value, detail="") { return `<section class="card"><h2>${title}</h2><strong>${value}</strong><small>${detail}</small></section>`; }
+  _card(title, value, detail="", icon="●") { return `<section class="card metric-card"><div class="metric-head"><span class="metric-icon">${icon}</span><h2>${title}</h2></div><strong>${value}</strong><small>${detail}</small></section>`; }
   _dashboard() {
     const s=this._status||{}, mqtt=s.mqtt||{}, display=s.display||{}, power=s.power||{};
-    return `<section class="grid cards">${this._card("DISPLAY",display.service_state||"—",display.paused?"En pause":"Actif")}${this._card("MQTT",mqtt.connected?"Connecté":"Hors ligne",mqtt.state||"—")}${this._card("TEMPÉRATURE",s.cpu_temperature_c==null?"—":`${s.cpu_temperature_c} °C`,"CPU")}${this._card("ALIMENTATION",power.undervoltage?"⚠ Sous-tension":"OK",power.throttled_code||"—")}${this._card("ÉCRAN ACTUEL",s.current_screen?.available?(s.current_screen.id||s.current_screen.type):"—",s.playlist?.mode||"legacy")}${this._card("UPTIME",this._duration(s.uptime_seconds),"Raspberry Pi")}</section>
+    return `<section class="grid cards">${this._card("DISPLAY",display.service_state||"—",display.paused?"En pause":"Actif","▣")}${this._card("MQTT",mqtt.connected?"Connecté":"Hors ligne",mqtt.state||"—","↯")}${this._card("TEMPÉRATURE",s.cpu_temperature_c==null?"—":`${s.cpu_temperature_c} °C`,"CPU","℃")}${this._card("ALIMENTATION",power.undervoltage?"⚠ Sous-tension":"OK",power.throttled_code||"—","⚡")}${this._card("ÉCRAN ACTUEL",s.current_screen?.available?(s.current_screen.id||s.current_screen.type):"—",s.playlist?.mode||"legacy","◈")}${this._card("UPTIME",this._duration(s.uptime_seconds),"Raspberry Pi","◷")}</section>
       ${power.undervoltage?`<p class="warning" role="alert">⚠ SOUS-TENSION DÉTECTÉE — code ${this._esc(power.throttled_code)}</p>`:""}<section class="card quick"><h2>Contrôles rapides</h2>${this._quickControls()}</section>`;
   }
   _quickControls() { return `<div class="controls"><label>Luminosité <input type="range" min="0" max="100" step="5" id="brightness" value="${this._brightness()}"></label>${["clock","date","weather","gif","mqtt"].map(f=>`<label class="toggle"><input type="checkbox" data-flag="${f}" ${this._flag(f)?"checked":""}> ${this._labelFlag(f)}</label>`).join("")}</div>`; }
