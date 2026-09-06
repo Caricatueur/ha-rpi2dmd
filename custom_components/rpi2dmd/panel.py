@@ -9,6 +9,7 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
 
 PANEL_PATH = "/rpi2dmd-panel.js"
+LOGO_PATH = "/rpi2dmd-assets/rpi2dmd-ha-logo.png"
 PANEL_URL = "rpi2dmd"
 
 
@@ -17,7 +18,13 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     if hass.data.get("rpi2dmd_panel_registered"):
         return
     js_path = str(Path(__file__).parent / "frontend" / "rpi2dmd-panel.js")
-    await hass.http.async_register_static_paths([StaticPathConfig(PANEL_PATH, js_path, False)])
+    logo_path = str(Path(__file__).parent / "frontend" / "assets" / "rpi2dmd-ha-logo.png")
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(PANEL_PATH, js_path, False),
+            StaticPathConfig(LOGO_PATH, logo_path, False),
+        ]
+    )
     await panel_custom.async_register_panel(
         hass,
         webcomponent_name="rpi2dmd-panel",

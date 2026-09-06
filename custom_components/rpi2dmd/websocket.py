@@ -13,6 +13,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.storage import Store
 
 from .api import RPI2DMDAuthError, RPI2DMDConnectionError, RPI2DMDError
 from .const import DOMAIN
@@ -56,6 +57,22 @@ def _entry_id(msg: Mapping[str, Any]) -> str:
     if not isinstance(value, str) or not value:
         raise ValueError("entry_id is required")
     return value
+
+
+def _safe_weather(data: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep weather credentials out of every browser-facing response."""
+    result = dict(data)
+    configured = bool(result.get("api_key_configured"))
+    for key in ("api_key", "apikey", "password", "token"):
+        if key in result:
+            configured = configured or bool(result[key])
+            result.pop(key, None)
+    result["api_key_configured"] = configured
+    return result
+
+
+def _schedule_store(hass: HomeAssistant, entry_id: str) -> Store:
+    return Store(hass, 1, f"{DOMAIN}.{entry_id}.brightness_schedule")
 
 
 def _send_error(connection, msg_id: int, err: Exception) -> None:
@@ -128,10 +145,23 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
         return {"entry_id": entry_id, "gifs": await api.async_get_gifs(category=msg.get("category"), search=msg.get("search"), limit=int(msg.get("limit", 50)), offset=int(msg.get("offset", 0)))}
     if command == "rpi2dmd/gifs/categories":
         return {"entry_id": entry_id, "categories": await api.async_get_gif_categories()}
+    if command == "rpi2dmd/gifs/categories/update":
+        return {"entry_id": entry_id, "categories": await api.async_update_gif_categories(msg.get("enabled_ids", []))}
+    if command == "rpi2dmd/brightness/schedule/get":
+        stored = await _schedule_store(hass, entry_id).async_load() or {}
+        remote = await api.async_get_brightness_schedule()
+        points = remote.get("points", remote.get("schedule", remote)) if isinstance(remote, Mapping) else remote
+        return {"entry_id": entry_id, "schedule": {"enabled": stored.get("enabled", True), "points": points if isinstance(points, list) else []}}
+    if command == "rpi2dmd/brightness/schedule/update":
+        enabled = bool(msg.get("enabled", True))
+        await _schedule_store(hass, entry_id).async_save({"enabled": enabled})
+        points = msg.get("schedule", [])
+        await api.async_update_brightness_schedule(points)
+        return {"entry_id": entry_id, "schedule": {"enabled": enabled, "points": points}}
     if command == "rpi2dmd/weather/get":
-        return {"entry_id": entry_id, "weather": await api.async_get_weather()}
+        return {"entry_id": entry_id, "weather": _safe_weather(await api.async_get_weather())}
     if command == "rpi2dmd/weather/update":
-        return {"entry_id": entry_id, "weather": await api.async_update_weather(msg.get("changes", {}))}
+        return {"entry_id": entry_id, "weather": _safe_weather(await api.async_update_weather(msg.get("changes", {})))}
     if command == "rpi2dmd/system":
         return {"entry_id": entry_id, "system": await api.async_get_system()}
     if command == "rpi2dmd/config/export":
@@ -173,6 +203,9 @@ WEBSOCKET_COMMANDS = (
     "rpi2dmd/mqtt/test",
     "rpi2dmd/gifs/list",
     "rpi2dmd/gifs/categories",
+    "rpi2dmd/gifs/categories/update",
+    "rpi2dmd/brightness/schedule/get",
+    "rpi2dmd/brightness/schedule/update",
     "rpi2dmd/weather/get",
     "rpi2dmd/weather/update",
     "rpi2dmd/system",
