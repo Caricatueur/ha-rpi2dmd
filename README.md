@@ -1,6 +1,6 @@
 # RPI2DMD pour Home Assistant
 
-![RPI2DMD connecté à Home Assistant](https://raw.githubusercontent.com/Caricatueur/ha-rpi2dmd/main/assets/rpi2dmd-ha-banner.png)
+![RPI2DMD connecté à Home Assistant](https://raw.githubusercontent.com/Caricatueur/ha-rpi2dmd/main/assets/rpi2dmd-ha-banner-4.png)
 
 Cette intégration permet de contrôler un RPI2DMD directement depuis Home
 Assistant. Le Raspberry reste autonome et Home Assistant utilise son API
