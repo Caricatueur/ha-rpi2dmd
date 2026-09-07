@@ -16,12 +16,10 @@ const RPI_EXACT_HERO_CSS = `
   .hero{min-height:clamp(300px,34vw,430px);background:linear-gradient(135deg,#07111f 0%,#0b1d35 48%,#081018 100%);border-color:rgba(34,211,238,.2);box-shadow:0 20px 54px rgba(2,8,23,.3)}
   .hero:after{z-index:0;background:radial-gradient(circle at 52% 45%,rgba(34,211,238,.18),transparent 48%),linear-gradient(180deg,rgba(5,10,20,.08),rgba(5,10,20,.22))}
   .hero-content{position:relative;z-index:1;display:block;min-height:clamp(300px,34vw,430px);padding:0}
-  .hero-art{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;min-width:0;padding:clamp(12px,2.5vw,28px);background:radial-gradient(ellipse at center,rgba(14,70,112,.24),transparent 72%)}
-  .hero-art:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(4,10,20,.18),transparent 25%,transparent 75%,rgba(4,10,20,.18)),linear-gradient(180deg,rgba(4,10,20,.12),transparent 24%,transparent 72%,rgba(4,10,20,.26));pointer-events:none}
-  .hero-banner{position:relative;display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;background:transparent;opacity:1;filter:saturate(1.05) contrast(1.02);z-index:1}
+  .hero-banner{position:absolute;inset:0;display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;object-position:center;background-image:none !important;background-color:transparent;opacity:1;filter:none;mix-blend-mode:normal;mask-image:none;-webkit-mask-image:none;z-index:1}
   .hero-overlay{position:absolute;right:clamp(14px,2.8vw,34px);bottom:clamp(14px,2.8vw,30px);z-index:2;display:flex;align-items:center;justify-content:flex-end;gap:12px;max-width:calc(100% - 28px);padding:10px 12px;border:1px solid rgba(148,220,255,.24);border-radius:14px;background:rgba(3,10,20,.76);box-shadow:0 10px 30px rgba(0,0,0,.3);backdrop-filter:blur(9px)}
   .hero-overlay .device{display:flex;align-items:center;gap:8px;color:#e0f2fe;font-weight:700;white-space:nowrap}.hero-overlay select{min-width:150px;background:rgba(15,34,54,.92);border-color:rgba(125,211,252,.35);color:#f0f9ff}.hero-overlay .online-pill{padding:7px 10px}
-  @media(max-width:700px){.hero{min-height:390px}.hero-content{min-height:390px}.hero-art{align-items:center;padding:18px 12px 86px}.hero-overlay{left:14px;right:14px;bottom:14px;justify-content:space-between;max-width:none;gap:8px}.hero-overlay .device{min-width:0;flex:1}.hero-overlay select{min-width:0;width:100%;flex:1}.hero-overlay .online-pill{flex-shrink:0}.hero-banner{width:100%;height:100%;object-fit:contain}}
+  @media(max-width:700px){.hero{min-height:390px}.hero-content{min-height:390px}.hero-banner{inset:0 0 72px;height:calc(100% - 72px)}.hero-overlay{left:14px;right:14px;bottom:14px;justify-content:space-between;max-width:none;gap:8px}.hero-overlay .device{min-width:0;flex:1}.hero-overlay select{min-width:0;width:100%;flex:1}.hero-overlay .online-pill{flex-shrink:0}}
 `;
 class Rpi2dmdPanel extends HTMLElement {
   constructor() {
@@ -111,7 +109,7 @@ class Rpi2dmdPanel extends HTMLElement {
   _render() {
     if (!this.shadowRoot) return;
     this.shadowRoot.innerHTML = `<style>${this._css()}${RPI_POLISH_CSS}${RPI_EXACT_HERO_CSS}</style><main>
-      <header class="hero"><div class="hero-content"><div class="hero-art"><img class="hero-banner" src="/rpi2dmd-assets/rpi2dmd-ha-banner.png" alt="RPI2DMD connecté à Home Assistant"></div><div class="hero-overlay"><span class="online-pill"><i></i> ${this._status ? "En ligne" : "Connexion…"}</span><label class="device">Appareil <select id="device">${this._devices.map(d => `<option value="${this._esc(d.entry_id)}" ${d.entry_id===this._entry?"selected":""}>${this._esc(this._deviceLabel(d))}</option>`).join("")}</select></label></div></div></header>
+      <header class="hero"><div class="hero-content"><img class="hero-banner" src="/rpi2dmd-assets/rpi2dmd-ha-banner.png" alt="RPI2DMD connecté à Home Assistant"><div class="hero-overlay"><span class="online-pill"><i></i> ${this._status ? "En ligne" : "Connexion…"}</span><label class="device">Appareil <select id="device">${this._devices.map(d => `<option value="${this._esc(d.entry_id)}" ${d.entry_id===this._entry?"selected":""}>${this._esc(this._deviceLabel(d))}</option>`).join("")}</select></label></div></div></header>
       <nav aria-label="Navigation">${["dashboard","display","brightness","playlist","mqtt","gif","weather","system","backup"].map(s => `<button class="nav ${this._section===s?"active":""}" data-nav="${s}">${this._label(s)}</button>`).join("")}</nav>
       ${this._error ? `<div class="error" role="alert">${this._esc(this._error)} <button data-action="retry">Réessayer</button></div>` : ""}
       ${this._content()}
