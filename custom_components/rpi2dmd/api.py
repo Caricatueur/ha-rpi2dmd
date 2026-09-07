@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import quote
 
 from aiohttp import ClientError, ClientSession
 
@@ -199,6 +201,36 @@ class RPI2DMDClient:
         if category:
             params["category"] = category
         return await self._request("GET", "/icons", params=params)
+
+    async def async_get_icon(self, icon_id: str) -> dict[str, str]:
+        """Return one validated PNG as an HA-safe data payload.
+
+        The browser never receives the Raspberry URL or API authorization;
+        the image is fetched through the existing authenticated client.
+        """
+        safe_id = quote(str(icon_id), safe="")
+        try:
+            async with asyncio.timeout(self.timeout):
+                async with self._session.request(
+                    "GET",
+                    f"{self.base_url}/icons/{safe_id}",
+                    headers={"Accept": "image/png", "Authorization": f"Bearer {self.token}"},
+                ) as response:
+                    if response.status in (401, 403):
+                        raise RPI2DMDAuthError("API authentication rejected")
+                    if response.status >= 400:
+                        raise RPI2DMDHTTPError(response.status, "Icon asset unavailable")
+                    content_type = response.headers.get("Content-Type", "image/png").split(";", 1)[0].lower()
+                    if content_type != "image/png":
+                        raise RPI2DMDError("Icon asset is not a PNG")
+                    data = await response.read()
+                    if not data:
+                        raise RPI2DMDError("Icon asset is empty")
+                    return {"content_type": "image/png", "data": base64.b64encode(data).decode("ascii")}
+        except RPI2DMDError:
+            raise
+        except (asyncio.TimeoutError, ClientError, OSError) as err:
+            raise RPI2DMDConnectionError("Unable to connect to RPI2DMD") from err
 
     async def async_pause(self) -> dict[str, Any]:
         return await self._request("POST", "/display/pause", body={})

@@ -173,6 +173,13 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
         return {"entry_id": entry_id, "playlist": await api.async_move_playlist_item(msg["item_id"], int(msg["index"]))}
     if command == "rpi2dmd/playlist/duplicate":
         return {"entry_id": entry_id, "item": await api.async_duplicate_playlist_item(msg["item_id"], msg.get("after_id"))}
+    if command == "rpi2dmd/icons/list":
+        return {"entry_id": entry_id, "icons": await api.async_get_icons(search=msg.get("search"), category=msg.get("category"), limit=int(msg.get("limit", 100)), offset=int(msg.get("offset", 0)))}
+    if command == "rpi2dmd/icons/get":
+        icon_id = msg.get("icon_id")
+        if not isinstance(icon_id, str) or not icon_id:
+            raise ValueError("icon_id is required")
+        return {"entry_id": entry_id, "icon": await api.async_get_icon(icon_id)}
     if command == "rpi2dmd/mqtt/get":
         return {"entry_id": entry_id, "mqtt": await api.async_get_mqtt(), "mqtt_status": await api.async_get_mqtt_status()}
     if command == "rpi2dmd/mqtt/update":
@@ -240,6 +247,8 @@ WEBSOCKET_COMMANDS = (
     "rpi2dmd/playlist/delete",
     "rpi2dmd/playlist/move",
     "rpi2dmd/playlist/duplicate",
+    "rpi2dmd/icons/list",
+    "rpi2dmd/icons/get",
     "rpi2dmd/mqtt/get",
     "rpi2dmd/mqtt/update",
     "rpi2dmd/mqtt/test",
