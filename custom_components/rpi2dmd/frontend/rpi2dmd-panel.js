@@ -10,11 +10,11 @@ const RPI_POLISH_CSS = `
   @media(max-width:700px){main{padding:16px 12px 34px}.item,.schedule-row,.category-card{align-items:flex-start;flex-direction:column}.actions{width:100%}nav{padding-top:13px}}
 `;
 const RPI_EXACT_HERO_CSS = `
-  .hero{position:relative;overflow:hidden;width:100%;height:clamp(350px,30vw,380px);border:1px solid rgba(148,220,255,.2);border-radius:24px;background-color:#050a12;background-image:url("/rpi2dmd-assets/rpi2dmd-ha-banner.png?v=2ffd8af5");background-repeat:no-repeat;background-position:center center;background-size:100% 100%;box-shadow:0 20px 54px rgba(2,8,23,.3);isolation:isolate}
+  .hero{position:relative;overflow:hidden;width:100%;height:clamp(350px,30vw,380px);border:1px solid rgba(148,220,255,.2);border-radius:24px;background-color:#050a12;background-image:url("/rpi2dmd-assets/rpi2dmd-ha-banner.png?v=165b4338");background-repeat:no-repeat;background-position:center center;background-size:100% 100%;box-shadow:0 20px 54px rgba(2,8,23,.3);isolation:isolate}
   .hero-content{position:relative;z-index:1;display:block;width:100%;height:100%;padding:0}
-  .hero-overlay{position:absolute;right:clamp(14px,2.8vw,34px);bottom:clamp(14px,2.8vw,30px);z-index:2;display:flex;align-items:center;justify-content:flex-end;gap:12px;max-width:calc(100% - 28px);padding:10px 12px;border:1px solid rgba(148,220,255,.24);border-radius:14px;background:rgba(3,10,20,.76);box-shadow:0 10px 30px rgba(0,0,0,.3);backdrop-filter:blur(9px)}
+  .hero-overlay{position:absolute;right:clamp(10px,2vw,16px);bottom:6px;z-index:2;display:flex;align-items:center;justify-content:flex-end;gap:12px;max-width:calc(100% - 28px);padding:10px 12px;border:1px solid rgba(148,220,255,.24);border-radius:14px;background:rgba(3,10,20,.76);box-shadow:0 10px 30px rgba(0,0,0,.3);backdrop-filter:blur(9px)}
   .hero-overlay .device{display:flex;align-items:center;gap:8px;color:#e0f2fe;font-weight:700;white-space:nowrap}.hero-overlay select{min-width:150px;background:rgba(15,34,54,.92);border-color:rgba(125,211,252,.35);color:#f0f9ff}.hero-overlay .online-pill{padding:7px 10px}
-  @media(max-width:700px){.hero{height:clamp(360px,78vw,430px)}.hero-overlay{left:14px;right:14px;bottom:14px;justify-content:space-between;max-width:none;gap:8px}.hero-overlay .device{min-width:0;flex:1}.hero-overlay select{min-width:0;width:100%;flex:1}.hero-overlay .online-pill{flex-shrink:0}}
+  @media(max-width:700px){.hero{height:clamp(360px,78vw,430px)}.hero-overlay{left:10px;right:10px;bottom:6px;justify-content:space-between;max-width:none;gap:8px}.hero-overlay .device{min-width:0;flex:1}.hero-overlay select{min-width:0;width:100%;flex:1}.hero-overlay .online-pill{flex-shrink:0}}
 `;
 class Rpi2dmdPanel extends HTMLElement {
   constructor() {
@@ -116,7 +116,7 @@ class Rpi2dmdPanel extends HTMLElement {
   _checkHeroBanner() {
     if (this._bannerChecked) return;
     this._bannerChecked = true;
-    fetch("/rpi2dmd-assets/rpi2dmd-ha-banner.png?v=2ffd8af5", { cache: "no-store" })
+    fetch("/rpi2dmd-assets/rpi2dmd-ha-banner.png?v=165b4338", { cache: "no-store" })
       .then((response) => { if (!response.ok) throw new Error(`HTTP ${response.status}`); })
       .catch(() => console.error("RPI2DMD hero banner failed to load"));
   }
