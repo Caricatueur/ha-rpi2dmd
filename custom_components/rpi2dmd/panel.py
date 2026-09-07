@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 PANEL_PATH = "/rpi2dmd-panel.js"
 LOGO_PATH = "/rpi2dmd-assets/rpi2dmd-ha-logo.png"
 BANNER_PATH = "/rpi2dmd-assets/rpi2dmd-ha-banner.png"
+BANNER4_PATH = "/rpi2dmd-assets/rpi2dmd-ha-banner-4.png"
 PANEL_URL = "rpi2dmd"
 
 
@@ -21,11 +22,13 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     js_path = str(Path(__file__).parent / "frontend" / "rpi2dmd-panel.js")
     logo_path = str(Path(__file__).parent / "frontend" / "assets" / "rpi2dmd-ha-logo.png")
     banner_path = str(Path(__file__).parent / "frontend" / "assets" / "rpi2dmd-ha-banner.png")
+    banner4_path = str(Path(__file__).parent / "frontend" / "assets" / "rpi2dmd-ha-banner-4.png")
     await hass.http.async_register_static_paths(
         [
             StaticPathConfig(PANEL_PATH, js_path, False),
             StaticPathConfig(LOGO_PATH, logo_path, False),
             StaticPathConfig(BANNER_PATH, banner_path, False),
+            StaticPathConfig(BANNER4_PATH, banner4_path, False),
         ]
     )
     await panel_custom.async_register_panel(
