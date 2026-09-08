@@ -161,7 +161,7 @@ class Rpi2dmdPanel extends HTMLElement {
       }
     }
   }
-  _showFeatureError(feature, err, userMessage = "") { this._featureErrors[feature] = userMessage || err?.message || "Erreur de chargement"; this._render(); }
+  _showFeatureError(feature, err, userMessage = "") { console.debug("RPI2DMD feature request failed", feature, err?.message || "unknown error"); this._featureErrors[feature] = userMessage || err?.message || "Erreur de chargement"; this._render(); }
   _showError(err, userMessage = "") {
     const message = err?.message || "";
     console.error("RPI2DMD Home Assistant WebSocket error", message);
