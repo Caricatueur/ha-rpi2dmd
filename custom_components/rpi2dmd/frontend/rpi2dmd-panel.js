@@ -35,6 +35,7 @@ class Rpi2dmdPanel extends HTMLElement {
     this._gifCategories = null;
     this._gifLoading = false;
     this._featureErrors = {};
+    this._sectionRequestId = 0;
     this._brightnessSchedule = { enabled: true, points: [] };
     this._iconPickerOpen = false;
     this._iconPickerTarget = null;
@@ -95,32 +96,51 @@ class Rpi2dmdPanel extends HTMLElement {
   }
   _clearRuntimeData() { this._status=null; this._display=null; this._playlist=null; this._mqtt=null; this._weather=null; this._gifs=null; this._gifCategories=null; }
   async _loadSection(section) {
+    const requestId = ++this._sectionRequestId;
     this._section = section;
+    this._featureErrors[section] = "";
     if (section === "gif") {
       this._gifLoading = true;
       this._gifs = null;
       this._gifCategories = null;
-      this._featureErrors.gif = "";
     }
     this._render();
+    let display;
+    let playlist;
+    let mqtt;
+    let weather;
+    let gifs;
+    let gifCategories;
+    let brightnessSchedule;
+    let system;
     try {
-      if (section === "display") this._display = (await this._ws("rpi2dmd/display/get")).display;
-      if (section === "playlist") this._playlist = (await this._ws("rpi2dmd/playlist/get")).playlist;
-      if (section === "mqtt") this._mqtt = (await this._ws("rpi2dmd/mqtt/get")).mqtt;
-      if (section === "weather") this._weather = (await this._ws("rpi2dmd/weather/get")).weather;
+      if (section === "display") display = (await this._ws("rpi2dmd/display/get")).display;
+      if (section === "playlist") playlist = (await this._ws("rpi2dmd/playlist/get")).playlist;
+      if (section === "mqtt") mqtt = (await this._ws("rpi2dmd/mqtt/get")).mqtt;
+      if (section === "weather") weather = (await this._ws("rpi2dmd/weather/get")).weather;
       if (section === "gif") {
-        this._gifs = (await this._ws("rpi2dmd/gifs/list", { limit: 100 })).gifs;
-        this._gifCategories = (await this._ws("rpi2dmd/gifs/categories")).categories;
+        gifs = (await this._ws("rpi2dmd/gifs/list", { limit: 100 })).gifs;
+        gifCategories = (await this._ws("rpi2dmd/gifs/categories")).categories;
       }
-      if (section === "brightness") { const raw=(await this._ws("rpi2dmd/brightness/schedule/get")).schedule || {}; this._brightnessSchedule = raw.points ? raw : { enabled: true, points: Array.isArray(raw)?raw:(raw.schedule||[]) }; }
-      if (section === "system") this._status = (await this._ws("rpi2dmd/system")).system;
-      if (section === "gif") this._featureErrors.gif = "";
+      if (section === "brightness") { const raw=(await this._ws("rpi2dmd/brightness/schedule/get")).schedule || {}; brightnessSchedule = raw.points ? raw : { enabled: true, points: Array.isArray(raw)?raw:(raw.schedule||[]) }; }
+      if (section === "system") system = (await this._ws("rpi2dmd/system")).system;
+      if (requestId !== this._sectionRequestId || this._section !== section) return;
+      if (section === "display") this._display = display;
+      if (section === "playlist") this._playlist = playlist;
+      if (section === "mqtt") this._mqtt = mqtt;
+      if (section === "weather") this._weather = weather;
+      if (section === "gif") { this._gifs = gifs; this._gifCategories = gifCategories; }
+      if (section === "brightness") this._brightnessSchedule = brightnessSchedule;
+      if (section === "system") this._status = system;
+      this._featureErrors[section] = "";
+      if (this._online) this._clearError();
       this._render();
     } catch (err) {
+      if (requestId !== this._sectionRequestId || this._section !== section) return;
       if (section === "gif") this._showFeatureError("gif", err, "Impossible de charger les GIF du RPI2DMD.");
       else this._showFeatureError(section, err);
     } finally {
-      if (section === "gif") {
+      if (section === "gif" && requestId === this._sectionRequestId && this._section === section) {
         this._gifLoading = false;
         this._render();
       }
@@ -148,7 +168,7 @@ class Rpi2dmdPanel extends HTMLElement {
     if (this._busy) return;
     this._busy = true; this._clearError(); this._render();
     try { this._display = (await this._ws("rpi2dmd/display/update", { changes })).display; await this._refreshStatus(); }
-    catch (err) { this._showError(err); }
+    catch (err) { this._showFeatureError("display", err, "Impossible d'enregistrer l'affichage."); }
     finally { this._busy = false; this._render(); }
   }
   _flag(name) { return (this._display?.flags || {})[name] === true || (this._status?.display?.active_flags || []).includes(name); }
@@ -159,6 +179,7 @@ class Rpi2dmdPanel extends HTMLElement {
       <header class="hero"><div class="hero-content"><div class="hero-overlay"><span class="online-pill ${this._online?"":"offline"}"><i></i> ${this._online ? "En ligne" : "Hors ligne"}</span><label class="device">Appareil <select id="device">${this._devices.map(d => `<option value="${this._esc(d.entry_id)}" ${d.entry_id===this._entry?"selected":""}>${this._esc(this._deviceLabel(d))}</option>`).join("")}</select></label></div></div></header>
       <nav aria-label="Navigation">${["dashboard","display","brightness","playlist","mqtt","gif","weather","system","backup"].map(s => `<button class="nav ${this._section===s?"active":""}" data-nav="${s}">${this._label(s)}</button>`).join("")}</nav>
       ${this._error ? `<div class="error" role="alert">${this._esc(this._error)} <button data-action="retry">Réessayer</button></div>` : ""}
+      ${this._section !== "gif" && this._featureErrors[this._section] ? `<div class="error" role="alert">${this._esc(this._featureErrors[this._section])}</div>` : ""}
       ${this._notice ? `<div class="success" role="status">${this._esc(this._notice)}</div>` : ""}
       ${this._content()}${this._iconPickerOpen ? this._iconPickerMarkup() : ""}
     </main>`;
@@ -262,23 +283,23 @@ class Rpi2dmdPanel extends HTMLElement {
     this.shadowRoot.querySelector("[data-action=export]")?.addEventListener("click",()=>this._export());
     this.shadowRoot.querySelector("#import")?.addEventListener("change",e=>this._import(e.target.files[0]));
   }
-  async _openIconPicker(itemId){this._iconPickerTarget=itemId;this._iconPickerOpen=true;this._iconSearch="";this._iconCategory="";this._render();try{this._icons=(await this._ws("rpi2dmd/icons/list",{limit:200})).icons||{};this._render();const items=this._iconItems();await Promise.all(items.slice(0,60).map(x=>this._loadIconPreview(x.id)));this._render();}catch(e){this._iconPickerOpen=false;this._showError(e,"Impossible de charger les icônes du RPI2DMD.");}}
+  async _openIconPicker(itemId){this._iconPickerTarget=itemId;this._iconPickerOpen=true;this._iconSearch="";this._iconCategory="";this._render();try{this._icons=(await this._ws("rpi2dmd/icons/list",{limit:200})).icons||{};this._render();const items=this._iconItems();await Promise.all(items.slice(0,60).map(x=>this._loadIconPreview(x.id)));this._render();}catch(e){this._iconPickerOpen=false;this._showFeatureError("playlist",e,"Impossible de charger les icônes du RPI2DMD.");}}
   async _loadIconPreview(iconId, target=null){if(this._iconPreviewCache[iconId]){if(target)target.src=this._iconPreviewCache[iconId];return;}try{const icon=(await this._ws("rpi2dmd/icons/get",{icon_id:iconId})).icon;const src=`data:${icon.content_type};base64,${icon.data}`;this._iconPreviewCache[iconId]=src;if(target)target.src=src;}catch(e){if(target)target.alt="Icône indisponible";}}
-  async _setItemIcon(itemId, iconId){if(!itemId)return;try{await this._playlistAction("rpi2dmd/playlist/update",{item_id:itemId,changes:{icon:iconId,show_icon:Boolean(iconId)}});this._iconPickerOpen=false;this._iconPickerTarget=null;await this._loadSection("playlist");}catch(e){this._showError(e,"Impossible d'enregistrer l'icône MQTT.");}}
+  async _setItemIcon(itemId, iconId){if(!itemId)return;try{await this._ws("rpi2dmd/playlist/update",{item_id:itemId,changes:{icon:iconId,show_icon:Boolean(iconId)}});this._iconPickerOpen=false;this._iconPickerTarget=null;await this._loadSection("playlist");}catch(e){this._showFeatureError("playlist",e,"Impossible d'enregistrer l'icône MQTT.");}}
   async _move(id,delta){const items=this._playlist?.items||[], i=items.findIndex(x=>x.id===id); if(i<0)return; await this._playlistAction("rpi2dmd/playlist/move",{item_id:id,index:i+delta});}
   async _toggleItem(id, enabled){await this._playlistAction("rpi2dmd/playlist/update",{item_id:id,changes:{enabled:Boolean(enabled)}});}
-  async _toggleGifCategory(id, enabled){const current=this._gifCategoriesList().filter(x=>x.enabled).map(x=>x.id);const next=enabled?[...new Set([...current,id])]:current.filter(x=>x!==id);try{await this._ws("rpi2dmd/gifs/categories/update",{enabled_ids:next});await this._loadSection("gif");}catch(e){this._showError(e);}}
-  async _playlistAction(type,extra){try{await this._ws(type,extra);await this._loadSection("playlist");}catch(e){this._showError(e,"Impossible de modifier la ligne de playlist.");}}
-  async _addItem(){const type=(prompt("Type : gif, time, date, weather ou mqtt","mqtt")||"").toLowerCase();if(!["gif","time","date","weather","mqtt"].includes(type))return;const item={type,enabled:true};if(type==="mqtt"){item.title=prompt("Titre","RPI2DMD")||"RPI2DMD";item.topic=prompt("Topic","")||"";item.unit=prompt("Unité","")||"";item.duration_seconds=Number(prompt("Durée en secondes","5"))||5;}try{const result=await this._ws("rpi2dmd/playlist/add",{item});await this._loadSection("playlist");if(type==="mqtt"&&result.item?.id)this._openIconPicker(result.item.id);}catch(e){this._showError(e);}}
-  async _saveMqtt(){try{const changes={broker:this.shadowRoot.querySelector("#broker").value,port:Number(this.shadowRoot.querySelector("#mqtt-port").value),username:this.shadowRoot.querySelector("#mqtt-user").value,client_id:this.shadowRoot.querySelector("#mqtt-client").value};const password=this.shadowRoot.querySelector("#mqtt-password").value;if(password)changes.password=password;await this._ws("rpi2dmd/mqtt/update",{changes});await this._refreshStatus();}catch(e){this._showError(e);}}
-  async _testMqtt(){try{const result=await this._ws("rpi2dmd/mqtt/test",{body:{use_saved_credentials:true}});alert(`DNS: ${result.result.dns_resolved}\nTCP: ${result.result.reachable}\nAuthentifié: ${result.result.authenticated}\nLatence: ${result.result.latency_ms} ms`);}catch(e){this._showError(e);}}
-  async _saveWeather(){try{const key=this.shadowRoot.querySelector("#weather-api-key").value;const changes={country:this.shadowRoot.querySelector("#weather-country").value,postal_code:this.shadowRoot.querySelector("#weather-zip").value,unit:this.shadowRoot.querySelector("#weather-unit").value};if(key)changes.api_key=key;await this._ws("rpi2dmd/weather/update",{changes});this.shadowRoot.querySelector("#weather-api-key").value="";await this._loadSection("weather");}catch(e){this._showError(e);}}
+  async _toggleGifCategory(id, enabled){const current=this._gifCategoriesList().filter(x=>x.enabled).map(x=>x.id);const next=enabled?[...new Set([...current,id])]:current.filter(x=>x!==id);try{await this._ws("rpi2dmd/gifs/categories/update",{enabled_ids:next});await this._loadSection("gif");}catch(e){this._showFeatureError("gif",e,"Impossible de modifier les catégories GIF.");}}
+  async _playlistAction(type,extra){try{await this._ws(type,extra);await this._loadSection("playlist");}catch(e){this._showFeatureError("playlist",e,"Impossible de modifier la ligne de playlist.");}}
+  async _addItem(){const type=(prompt("Type : gif, time, date, weather ou mqtt","mqtt")||"").toLowerCase();if(!["gif","time","date","weather","mqtt"].includes(type))return;const item={type,enabled:true};if(type==="mqtt"){item.title=prompt("Titre","RPI2DMD")||"RPI2DMD";item.topic=prompt("Topic","")||"";item.unit=prompt("Unité","")||"";item.duration_seconds=Number(prompt("Durée en secondes","5"))||5;}try{const result=await this._ws("rpi2dmd/playlist/add",{item});await this._loadSection("playlist");if(type==="mqtt"&&result.item?.id)this._openIconPicker(result.item.id);}catch(e){this._showFeatureError("playlist",e,"Impossible d'ajouter la ligne de playlist.");}}
+  async _saveMqtt(){try{const changes={broker:this.shadowRoot.querySelector("#broker").value,port:Number(this.shadowRoot.querySelector("#mqtt-port").value),username:this.shadowRoot.querySelector("#mqtt-user").value,client_id:this.shadowRoot.querySelector("#mqtt-client").value};const password=this.shadowRoot.querySelector("#mqtt-password").value;if(password)changes.password=password;await this._ws("rpi2dmd/mqtt/update",{changes});await this._refreshStatus();}catch(e){this._showFeatureError("mqtt",e,"Impossible d'enregistrer la configuration MQTT.");}}
+  async _testMqtt(){try{const result=await this._ws("rpi2dmd/mqtt/test",{body:{use_saved_credentials:true}});alert(`DNS: ${result.result.dns_resolved}\nTCP: ${result.result.reachable}\nAuthentifié: ${result.result.authenticated}\nLatence: ${result.result.latency_ms} ms`);}catch(e){this._showFeatureError("mqtt",e,"Impossible de tester la connexion MQTT.");}}
+  async _saveWeather(){try{const key=this.shadowRoot.querySelector("#weather-api-key").value;const changes={country:this.shadowRoot.querySelector("#weather-country").value,postal_code:this.shadowRoot.querySelector("#weather-zip").value,unit:this.shadowRoot.querySelector("#weather-unit").value};if(key)changes.api_key=key;await this._ws("rpi2dmd/weather/update",{changes});this.shadowRoot.querySelector("#weather-api-key").value="";await this._loadSection("weather");}catch(e){this._showFeatureError("weather",e,"Impossible d'enregistrer la météo.");}}
   _scheduleAdd(){this._brightnessSchedule.points=this._brightnessSchedule.points||[];this._brightnessSchedule.points.push({time:"12:00",value:50});this._render();}
   _scheduleReadForm(){const points=[...this.shadowRoot.querySelectorAll("[data-schedule-time]")].map((el,i)=>({time:el.value,value:Number(this.shadowRoot.querySelector(`[data-schedule-value="${i}"]`).value)}));const seen=new Set();for(const p of points){const match=/^([01]\d|2[0-3]):([0-5]\d)$/.exec(p.time);if(!match)throw new Error(`L'heure « ${p.time||""} » est invalide (format HH:00 attendu).`);if(match[2]!=="00")throw new Error(`L'heure « ${p.time} » est invalide : les minutes doivent être 00.`);if(!Number.isInteger(p.value)||p.value<0||p.value>100)throw new Error(`La luminosité de ${p.time} doit être comprise entre 0 et 100.`);if(p.value%5)throw new Error(`La luminosité ${p.value} % de ${p.time} est invalide : utilisez un multiple de 5.`);if(seen.has(p.time))throw new Error(`Deux lignes utilisent la même heure : ${p.time}.`);seen.add(p.time);}if(!points.length)throw new Error("Le planning doit contenir au moins une heure.");return points.sort((a,b)=>a.time.localeCompare(b.time));}
-  async _scheduleSave(){try{const points=this._scheduleReadForm();await this._ws("rpi2dmd/brightness/schedule/update",{schedule:points,enabled:this._brightnessSchedule.enabled!==false});this._brightnessSchedule.points=points;await this._loadSection("brightness");this._showNotice("✓ Planning enregistré");}catch(e){this._showError(e,`✕ Impossible d'enregistrer le planning : ${e.message||"vérifiez les champs."}`);}}
-  async _scheduleApply(){try{const points=this._scheduleReadForm();const now=new Date();const current=points.filter(p=>p.time<=`${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`).at(-1)||points.at(-1);if(!current)throw new Error("aucun point horaire disponible");const result=await this._ws("rpi2dmd/display/update",{changes:{brightness:{schedule:[{hour:now.getHours(),value:current.value}]}}});this._display=result.display;await this._refreshStatus();this._showNotice(`✓ Luminosité appliquée : ${current.value} %`);}catch(e){this._showError(e,`✕ Impossible d'appliquer la luminosité : ${e.message||"réessayez."}`);}}
-  async _export(){try{const data=(await this._ws("rpi2dmd/config/export")).config;const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="rpi2dmd-config.json";a.click();URL.revokeObjectURL(a.href);}catch(e){this._showError(e);}}
-  async _import(file){if(!file)return;try{const doc=JSON.parse(await file.text());const validation=(await this._ws("rpi2dmd/config/import/validate",{document:doc})).validation;if(!validation.valid)throw new Error("Configuration invalide");if(confirm("Appliquer cette configuration ?")){await this._ws("rpi2dmd/config/import/apply",{validation_token:validation.validation_token});await this._refreshStatus();} }catch(e){this._showError(e);}}
+  async _scheduleSave(){try{const points=this._scheduleReadForm();await this._ws("rpi2dmd/brightness/schedule/update",{schedule:points,enabled:this._brightnessSchedule.enabled!==false});this._brightnessSchedule.points=points;await this._loadSection("brightness");this._showNotice("✓ Planning enregistré");}catch(e){this._showFeatureError("brightness",e,`✕ Impossible d'enregistrer le planning : ${e.message||"vérifiez les champs."}`);}}
+  async _scheduleApply(){try{const points=this._scheduleReadForm();const now=new Date();const current=points.filter(p=>p.time<=`${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`).at(-1)||points.at(-1);if(!current)throw new Error("aucun point horaire disponible");const result=await this._ws("rpi2dmd/display/update",{changes:{brightness:{schedule:[{hour:now.getHours(),value:current.value}]}}});this._display=result.display;await this._refreshStatus();this._showNotice(`✓ Luminosité appliquée : ${current.value} %`);}catch(e){this._showFeatureError("brightness",e,`✕ Impossible d'appliquer la luminosité : ${e.message||"réessayez."}`);}}
+  async _export(){try{const data=(await this._ws("rpi2dmd/config/export")).config;const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="rpi2dmd-config.json";a.click();URL.revokeObjectURL(a.href);}catch(e){this._showFeatureError("backup",e,"Impossible d'exporter la configuration.");}}
+  async _import(file){if(!file)return;try{const doc=JSON.parse(await file.text());const validation=(await this._ws("rpi2dmd/config/import/validate",{document:doc})).validation;if(!validation.valid)throw new Error("Configuration invalide");if(confirm("Appliquer cette configuration ?")){await this._ws("rpi2dmd/config/import/apply",{validation_token:validation.validation_token});await this._refreshStatus();} }catch(e){this._showFeatureError("backup",e,"Impossible d'importer la configuration.");}}
   _css(){return `:host{display:block;color:var(--primary-text-color);background:var(--primary-background-color);min-height:100vh;font-family:var(--paper-font-body1_-_font-family, sans-serif)}main{max-width:1200px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{display:flex;align-items:center;gap:16px;min-width:0}.logo{display:block;width:min(360px,42vw);max-height:90px;object-fit:contain}h1{margin:0;font-size:2rem}h2{margin:0 0 12px;font-size:1.1rem}.sub,small{color:var(--secondary-text-color)}nav{display:flex;gap:6px;overflow:auto;padding:20px 0 12px;border-bottom:1px solid var(--divider-color)}button,select,input{font:inherit}button{border:0;border-radius:8px;padding:10px 14px;background:var(--primary-color);color:var(--text-primary-color,#fff);cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.nav{background:var(--secondary-background-color);color:var(--primary-text-color);white-space:nowrap}.nav.active{background:var(--primary-color);color:#fff}.card{background:var(--card-background-color);border:1px solid var(--divider-color);border-radius:14px;padding:18px;margin:16px 0;box-shadow:var(--ha-card-box-shadow,none)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}.cards .card{margin:0}.card strong{display:block;font-size:1.5rem;margin:8px 0}.controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center}.controls label,.card>label{display:flex;flex-direction:column;gap:6px;margin:10px 0}.toggle{flex-direction:row!important;align-items:center}.row,.item{display:flex;justify-content:space-between;align-items:center;gap:12px}.item{border-top:1px solid var(--divider-color);padding:14px 0;min-width:0}.disabled-item{opacity:.62}.playlist-state{display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}.actions{display:flex;gap:5px;flex-wrap:wrap}.actions button{padding:7px 9px}.error{background:var(--error-color);color:#fff;padding:12px;border-radius:8px;margin:14px 0}.warning{background:var(--warning-color);padding:14px;border-radius:8px;color:var(--primary-text-color)}input,select{background:var(--secondary-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);border-radius:6px;padding:9px;max-width:100%}.device{display:flex;align-items:center;gap:8px}.category-list{display:grid;gap:12px}.category-card,.schedule-row{display:flex;justify-content:space-between;align-items:center;gap:14px;border:1px solid var(--divider-color);border-radius:10px;padding:14px;min-width:0}.category-card small{display:block;margin-top:5px}.schedule-list{display:grid;gap:10px;margin:14px 0}.schedule-row label{display:flex;align-items:center;gap:8px;min-width:0}.file{display:block;margin-top:20px}@media(max-width:600px){main{padding:14px}.brand{align-items:flex-start}.logo{width:100%;max-width:300px;height:auto}header{align-items:flex-start;flex-direction:column}.device{width:100%}.device select{width:100%}.item,.schedule-row,.category-card{align-items:flex-start;flex-direction:column}.actions{width:100%}nav{padding-top:12px}}
 `}
 }
