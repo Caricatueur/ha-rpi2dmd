@@ -153,8 +153,17 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
     coordinator = runtime["coordinator"]
 
     if command == "rpi2dmd/status":
-        await coordinator.async_request_refresh()
-        return {"entry_id": entry_id, "status": coordinator.data}
+        try:
+            await coordinator.async_request_refresh()
+        except Exception:  # Coordinator records the failure and marks itself unavailable.
+            _LOGGER.debug("RPI2DMD status refresh failed for entry %s", entry_id, exc_info=True)
+        available = bool(getattr(coordinator, "available", False))
+        return {
+            "entry_id": entry_id,
+            "online": available,
+            "available": available,
+            "status": coordinator.data if available else {},
+        }
     if command == "rpi2dmd/display/get":
         return {"entry_id": entry_id, "display": await api.async_get_display()}
     if command == "rpi2dmd/display/update":
