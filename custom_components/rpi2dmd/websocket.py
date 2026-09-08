@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 import logging
 import re
+import time
 from typing import Any
 
 import voluptuous as vol
@@ -196,9 +197,27 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
     if command == "rpi2dmd/mqtt/test":
         return {"entry_id": entry_id, "result": await api.async_test_mqtt(msg.get("body"))}
     if command == "rpi2dmd/gifs/list":
-        return {"entry_id": entry_id, "gifs": await api.async_get_gifs(category=msg.get("category"), search=msg.get("search"), limit=int(msg.get("limit", 50)), offset=int(msg.get("offset", 0)))}
+        started = time.monotonic()
+        try:
+            result = await api.async_get_gifs(category=msg.get("category"), search=msg.get("search"), limit=int(msg.get("limit", 50)), offset=int(msg.get("offset", 0)))
+            _LOGGER.debug("GIF DEBUG command=%s entry=%s duration=%.2fs success count=%s", command, entry_id, time.monotonic() - started, result.get("total", result.get("count")))
+            return {"entry_id": entry_id, "gifs": result}
+        except Exception as err:
+            _LOGGER.debug("GIF DEBUG command=%s entry=%s duration=%.2fs failure=%s", command, entry_id, time.monotonic() - started, type(err).__name__)
+            raise
     if command == "rpi2dmd/gifs/categories":
-        return {"entry_id": entry_id, "categories": await api.async_get_gif_categories()}
+        started = time.monotonic()
+        try:
+            result = await api.async_get_gif_categories()
+            count = result.get("count") if isinstance(result, Mapping) else None
+            if count is None and isinstance(result, Mapping):
+                values = result.get("categories", result.get("items"))
+                count = len(values) if isinstance(values, list) else None
+            _LOGGER.debug("GIF DEBUG command=%s entry=%s duration=%.2fs success count=%s", command, entry_id, time.monotonic() - started, count)
+            return {"entry_id": entry_id, "categories": result}
+        except Exception as err:
+            _LOGGER.debug("GIF DEBUG command=%s entry=%s duration=%.2fs failure=%s", command, entry_id, time.monotonic() - started, type(err).__name__)
+            raise
     if command == "rpi2dmd/gifs/categories/update":
         return {"entry_id": entry_id, "categories": await api.async_update_gif_categories(msg.get("enabled_ids", []))}
     if command == "rpi2dmd/brightness/schedule/get":

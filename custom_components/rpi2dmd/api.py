@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
+import time
 from collections.abc import Mapping
 from typing import Any
 from urllib.parse import quote
@@ -12,6 +14,8 @@ from urllib.parse import quote
 from aiohttp import ClientError, ClientSession
 
 from .const import API_PREFIX, DEFAULT_TIMEOUT
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class RPI2DMDError(Exception):
@@ -67,6 +71,8 @@ class RPI2DMDClient:
             headers["Authorization"] = f"Bearer {self.token}"
         if body is not None:
             headers["Content-Type"] = "application/json; charset=utf-8"
+        gif_debug = path.startswith("/gifs")
+        started = time.monotonic()
         try:
             async with asyncio.timeout(self.timeout):
                 async with self._session.request(
@@ -77,8 +83,12 @@ class RPI2DMDClient:
                     json=body,
                 ) as response:
                     if response.status in (401, 403):
+                        if gif_debug:
+                            _LOGGER.debug("GIF DEBUG request=%s endpoint=%s status=%s duration=%.2fs failure=auth", method, path, response.status, time.monotonic() - started)
                         raise RPI2DMDAuthError("API authentication rejected")
                     if response.status >= 400:
+                        if gif_debug:
+                            _LOGGER.debug("GIF DEBUG request=%s endpoint=%s status=%s duration=%.2fs failure=http", method, path, response.status, time.monotonic() - started)
                         try:
                             payload = await response.json(content_type=None)
                             message = payload.get("error", {}).get("message", "API error")
@@ -90,18 +100,33 @@ class RPI2DMDClient:
                     # contract intentionally has no response document.
                     raw = await response.read()
                     if not raw.strip():
+                        if gif_debug:
+                            _LOGGER.debug("GIF DEBUG request=%s endpoint=%s status=%s duration=%.2fs response=empty", method, path, response.status, time.monotonic() - started)
                         return {}
                     try:
                         payload = json.loads(raw.decode(response.charset or "utf-8"))
                     except (UnicodeDecodeError, ValueError, TypeError) as err:
+                        if gif_debug:
+                            _LOGGER.debug("GIF DEBUG request=%s endpoint=%s status=%s duration=%.2fs failure=invalid_json error=%s", method, path, response.status, time.monotonic() - started, type(err).__name__)
                         raise RPI2DMDError("Invalid JSON response") from err
                     if not isinstance(payload, dict) or payload.get("ok") is not True:
+                        if gif_debug:
+                            _LOGGER.debug("GIF DEBUG request=%s endpoint=%s status=%s duration=%.2fs failure=malformed_json", method, path, response.status, time.monotonic() - started)
                         raise RPI2DMDError("Malformed API response")
                     data = payload.get("data")
-                    return data if isinstance(data, dict) else {}
+                    result = data if isinstance(data, dict) else {}
+                    if gif_debug:
+                        count = result.get("total", result.get("count"))
+                        if count is None:
+                            values = result.get("categories", result.get("items"))
+                            count = len(values) if isinstance(values, list) else None
+                        _LOGGER.debug("GIF DEBUG request=%s endpoint=%s status=%s duration=%.2fs response=dict count=%s", method, path, response.status, time.monotonic() - started, count)
+                    return result
         except RPI2DMDError:
             raise
         except (asyncio.TimeoutError, ClientError, OSError) as err:
+            if gif_debug:
+                _LOGGER.debug("GIF DEBUG request=%s endpoint=%s duration=%.2fs failure=%s", method, path, time.monotonic() - started, type(err).__name__)
             raise RPI2DMDConnectionError("Unable to connect to RPI2DMD") from err
 
     async def async_get_info(self) -> dict[str, Any]:
