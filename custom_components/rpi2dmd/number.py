@@ -47,7 +47,7 @@ class RPI2DMDNumber(RPI2DMDEntity, NumberEntity):
 
     @property
     def native_value(self):
-        return self._value if self.coordinator.available else None
+        return self._value if self.coordinator.last_update_success else None
 
     async def async_set_native_value(self, value: float) -> None:
         hour = datetime.now().hour
