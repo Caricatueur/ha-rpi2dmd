@@ -142,7 +142,7 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
                     "name": getattr(entry, "title", None) or info.get("hostname") or "RPI2DMD",
                     "model": info.get("model"),
                     "host": entry.data.get("host"),
-                    "available": bool(coordinator and getattr(coordinator, "available", False)),
+                    "available": bool(coordinator and getattr(coordinator, "last_update_success", False)),
                 }
             )
         return {"devices": result}
@@ -157,7 +157,7 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
             await coordinator.async_request_refresh()
         except Exception:  # Coordinator records the failure and marks itself unavailable.
             _LOGGER.debug("RPI2DMD status refresh failed for entry %s", entry_id, exc_info=True)
-        available = bool(getattr(coordinator, "available", False))
+        available = bool(getattr(coordinator, "last_update_success", False))
         return {
             "entry_id": entry_id,
             "online": available,

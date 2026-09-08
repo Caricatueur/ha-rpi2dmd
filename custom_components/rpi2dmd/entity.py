@@ -32,7 +32,7 @@ class RPI2DMDEntity(CoordinatorEntity[RPI2DMDCoordinator]):
 
     @property
     def available(self) -> bool:
-        return super().available and bool(self.coordinator.data)
+        return bool(self.coordinator.last_update_success and self.coordinator.data)
 
     def _status(self) -> dict[str, Any]:
         return self.coordinator.data or {}
