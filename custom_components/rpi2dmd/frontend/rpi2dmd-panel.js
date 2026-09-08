@@ -5,7 +5,7 @@ const RPI_POLISH_CSS = `
   *{box-sizing:border-box}:host{--rpi-blue:#03a9f4;--rpi-cyan:#22d3ee;--rpi-purple:#a855f7}
   main{max-width:1280px;padding:28px clamp(16px,3vw,42px) 48px}
   .hero-content{position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;min-height:280px;padding:30px clamp(22px,4vw,48px)}
-  .eyebrow{margin:0 0 8px;color:#67e8f9;font-size:.74rem;font-weight:800;letter-spacing:.2em}.hero h1{margin:0;color:#fff;font-size:clamp(2.1rem,5vw,4rem);letter-spacing:-.045em;line-height:1}.hero .sub{margin:.65rem 0 0;color:#cbd5e1}.hero-meta{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}.online-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid rgba(103,232,249,.35);border-radius:999px;background:rgba(8,47,73,.72);color:#cffafe;font-weight:700;font-size:.84rem;white-space:nowrap}.online-pill i{display:block;width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 13px #34d399}.device{font-weight:700}
+  .eyebrow{margin:0 0 8px;color:#67e8f9;font-size:.74rem;font-weight:800;letter-spacing:.2em}.hero h1{margin:0;color:#fff;font-size:clamp(2.1rem,5vw,4rem);letter-spacing:-.045em;line-height:1}.hero .sub{margin:.65rem 0 0;color:#cbd5e1}.hero-meta{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}.online-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid rgba(103,232,249,.35);border-radius:999px;background:rgba(8,47,73,.72);color:#cffafe;font-weight:700;font-size:.84rem;white-space:nowrap}.online-pill i{display:block;width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 13px #34d399}.online-pill.offline{border-color:rgba(248,113,113,.45);background:rgba(69,10,10,.76);color:#fecaca}.online-pill.offline i{background:#f87171;box-shadow:0 0 13px #f87171}.device{font-weight:700}
   .metric-card{position:relative;overflow:hidden}.metric-card:after{content:"";position:absolute;width:100px;height:100px;right:-38px;bottom:-42px;border-radius:50%;background:rgba(34,211,238,.1)}.metric-head{display:flex;align-items:center;gap:9px}.metric-head h2{margin:0;color:var(--secondary-text-color);font-size:.78rem;letter-spacing:.1em}.metric-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,rgba(34,211,238,.2),rgba(168,85,247,.2));color:var(--rpi-blue);font-weight:800}.card{border-radius:18px;box-shadow:0 8px 26px rgba(0,0,0,.08)}.card strong{margin:16px 0 5px;letter-spacing:-.025em}.nav{border:1px solid var(--divider-color);border-radius:10px;box-shadow:none;font-weight:650;transition:all .16s ease}.nav.active{background:linear-gradient(135deg,var(--rpi-blue),var(--rpi-purple));box-shadow:0 5px 18px rgba(59,130,246,.3)}button{border-radius:10px;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}button:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 7px 18px rgba(3,169,244,.25)}.category-card,.schedule-row{background:color-mix(in srgb,var(--secondary-background-color) 65%,transparent);border-radius:12px}.disabled-item{opacity:.58}.warning{border:1px solid rgba(245,158,11,.45);border-radius:14px;background:linear-gradient(110deg,rgba(245,158,11,.2),rgba(239,68,68,.12));font-weight:700}.success{border:1px solid rgba(34,197,94,.45);border-radius:12px;background:rgba(34,197,94,.16);color:var(--primary-text-color);font-weight:700}.brightness-control{flex:1 1 280px;min-width:min(100%,280px);margin:0!important}.brightness-line{display:flex;align-items:center;justify-content:space-between;gap:12px}.brightness-value{font-variant-numeric:tabular-nums;font-weight:700;color:var(--primary-text-color)}.brightness-slider{position:relative;width:100%;height:28px;margin:2px 0 0}.brightness-track{position:absolute;left:10px;right:10px;top:50%;height:6px;transform:translateY(-50%);border-radius:999px;background:color-mix(in srgb,var(--secondary-text-color) 35%,var(--secondary-background-color))}.brightness-fill{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--rpi-blue),var(--rpi-cyan));pointer-events:none}.brightness-input{position:absolute;inset:0;width:100%;height:28px;padding:0;margin:0;background:transparent;appearance:none;-webkit-appearance:none;cursor:pointer;z-index:1}.brightness-input::-webkit-slider-runnable-track{height:6px;background:transparent;border:0}.brightness-input::-webkit-slider-thumb{width:20px;height:20px;margin-top:-7px;border:2px solid #e0f2fe;border-radius:50%;background:var(--rpi-blue);box-shadow:0 0 0 3px rgba(3,169,244,.2),0 2px 8px rgba(0,0,0,.3);-webkit-appearance:none}.brightness-input::-moz-range-track{height:6px;background:transparent;border:0}.brightness-input::-moz-range-progress{height:6px;background:transparent}.brightness-input::-moz-range-thumb{width:20px;height:20px;border:2px solid #e0f2fe;border-radius:50%;background:var(--rpi-blue);box-shadow:0 0 0 3px rgba(3,169,244,.2),0 2px 8px rgba(0,0,0,.3)}
   @media(max-width:700px){main{padding:16px 12px 34px}.item,.schedule-row,.category-card{align-items:flex-start;flex-direction:column}.actions{width:100%}nav{padding-top:13px}}
 `;
@@ -24,6 +24,7 @@ class Rpi2dmdPanel extends HTMLElement {
     this._hass = null;
     this._devices = [];
     this._entry = null;
+    this._online = false;
     this._section = "dashboard";
     this._status = null;
     this._display = null;
@@ -73,11 +74,24 @@ class Rpi2dmdPanel extends HTMLElement {
   }
   async _refreshStatus() {
     if (this._entry === null) return;
+    const wasOnline = this._online;
     try {
-      this._status = (await this._ws("rpi2dmd/status")).status;
+      const result = await this._ws("rpi2dmd/status");
+      this._online = result.online === true || result.available === true;
+      this._status = this._online ? (result.status || {}) : null;
+      if (!this._online) {
+        this._clearRuntimeData();
+        this._error = "Impossible de joindre le RPI2DMD. Les données temps réel sont temporairement indisponibles.";
+      } else this._clearError();
       this._render();
-    } catch (err) { this._showError(err); }
+      if (this._online && !wasOnline && this._section !== "dashboard") await this._loadSection(this._section);
+    } catch (err) {
+      this._online = false;
+      this._clearRuntimeData();
+      this._showError(err, "Impossible de joindre le RPI2DMD. Les données temps réel sont temporairement indisponibles.");
+    }
   }
+  _clearRuntimeData() { this._status=null; this._display=null; this._playlist=null; this._mqtt=null; this._weather=null; this._gifs=null; this._gifCategories=null; }
   async _loadSection(section) {
     this._section = section;
     this._render();
@@ -122,7 +136,7 @@ class Rpi2dmdPanel extends HTMLElement {
   _render() {
     if (!this.shadowRoot) return;
     this.shadowRoot.innerHTML = `<style>${this._css()}${RPI_POLISH_CSS}${RPI_EXACT_HERO_CSS}${ICON_PICKER_CSS}</style><main>
-      <header class="hero"><div class="hero-content"><div class="hero-overlay"><span class="online-pill"><i></i> ${this._status ? "En ligne" : "Connexion…"}</span><label class="device">Appareil <select id="device">${this._devices.map(d => `<option value="${this._esc(d.entry_id)}" ${d.entry_id===this._entry?"selected":""}>${this._esc(this._deviceLabel(d))}</option>`).join("")}</select></label></div></div></header>
+      <header class="hero"><div class="hero-content"><div class="hero-overlay"><span class="online-pill ${this._online?"":"offline"}"><i></i> ${this._online ? "En ligne" : "Hors ligne"}</span><label class="device">Appareil <select id="device">${this._devices.map(d => `<option value="${this._esc(d.entry_id)}" ${d.entry_id===this._entry?"selected":""}>${this._esc(this._deviceLabel(d))}</option>`).join("")}</select></label></div></div></header>
       <nav aria-label="Navigation">${["dashboard","display","brightness","playlist","mqtt","gif","weather","system","backup"].map(s => `<button class="nav ${this._section===s?"active":""}" data-nav="${s}">${this._label(s)}</button>`).join("")}</nav>
       ${this._error ? `<div class="error" role="alert">${this._esc(this._error)} <button data-action="retry">Réessayer</button></div>` : ""}
       ${this._notice ? `<div class="success" role="status">${this._esc(this._notice)}</div>` : ""}
@@ -157,11 +171,11 @@ class Rpi2dmdPanel extends HTMLElement {
   }
   _card(title, value, detail="", icon="●") { return `<section class="card metric-card"><div class="metric-head"><span class="metric-icon">${icon}</span><h2>${title}</h2></div><strong>${value}</strong><small>${detail}</small></section>`; }
   _dashboard() {
-    const s=this._status||{}, mqtt=s.mqtt||{}, display=s.display||{}, power=s.power||{};
-    return `<section class="grid cards">${this._card("DISPLAY",display.service_state||"—",display.paused?"En pause":"Actif","▣")}${this._card("MQTT",mqtt.connected?"Connecté":"Hors ligne",mqtt.state||"—","↯")}${this._card("TEMPÉRATURE",s.cpu_temperature_c==null?"—":`${s.cpu_temperature_c} °C`,"CPU","℃")}${this._card("ALIMENTATION",power.undervoltage?"⚠ Sous-tension":"OK",power.throttled_code||"—","⚡")}${this._card("ÉCRAN ACTUEL",s.current_screen?.available?(s.current_screen.id||s.current_screen.type):"—",s.playlist?.mode||"legacy","◈")}${this._card("UPTIME",this._duration(s.uptime_seconds),"Raspberry Pi","◷")}</section>
-      ${power.undervoltage?`<p class="warning" role="alert">⚠ SOUS-TENSION DÉTECTÉE — code ${this._esc(power.throttled_code)}</p>`:""}<section class="card quick"><h2>Contrôles rapides</h2>${this._quickControls()}</section>`;
+    const online=this._online===true, s=online?(this._status||{}):{}, mqtt=s.mqtt||{}, display=s.display||{}, power=s.power||{};
+    return `<section class="grid cards">${this._card("DISPLAY",online?(display.service_state||"—"):"—",online?(display.paused?"En pause":"Actif"):"Indisponible","▣")}${this._card("MQTT",online?(mqtt.connected?"Connecté":"Déconnecté"):"—",online?(mqtt.state||"—"):"Indisponible","↯")}${this._card("TEMPÉRATURE",online&&s.cpu_temperature_c!=null?`${s.cpu_temperature_c} °C`:"—","CPU","℃")}${this._card("ALIMENTATION",online?(power.undervoltage?"⚠ Sous-tension":"OK"):"—",online?(power.throttled_code||"—"):"Indisponible","⚡")}${this._card("ÉCRAN ACTUEL",online&&s.current_screen?.available?(s.current_screen.id||s.current_screen.type):"—",online?(s.playlist?.mode||"legacy"):"Indisponible","◈")}${this._card("UPTIME",online?this._duration(s.uptime_seconds):"—","Raspberry Pi","◷")}</section>
+      ${online&&power.undervoltage?`<p class="warning" role="alert">⚠ SOUS-TENSION DÉTECTÉE — code ${this._esc(power.throttled_code)}</p>`:""}<section class="card quick"><h2>Contrôles rapides</h2>${this._quickControls()}</section>`;
   }
-  _quickControls() { const brightness=this._brightness(); const percentage=((Number(brightness)-0)/(100-0))*100; return `<div class="controls"><label class="brightness-control"><span class="brightness-line"><span>Luminosité</span><output class="brightness-value" id="brightness-value" for="brightness">${brightness} %</output></span><div class="brightness-slider"><div class="brightness-track"><div class="brightness-fill" id="brightness-fill" style="width:${percentage}%"></div></div><input class="brightness-input" type="range" min="0" max="100" step="5" id="brightness" value="${brightness}" aria-label="Luminosité"></div></label>${["clock","date","weather","gif","mqtt"].map(f=>`<label class="toggle"><input type="checkbox" data-flag="${f}" ${this._flag(f)?"checked":""}> ${this._labelFlag(f)}</label>`).join("")}</div>`; }
+  _quickControls() { const online=this._online===true, brightness=online?this._brightness():0, percentage=online?((Number(brightness)-0)/(100-0))*100:0; return `<div class="controls"><label class="brightness-control"><span class="brightness-line"><span>Luminosité</span><output class="brightness-value" id="brightness-value" for="brightness">${online?`${brightness} %`:"—"}</output></span><div class="brightness-slider"><div class="brightness-track"><div class="brightness-fill" id="brightness-fill" style="width:${percentage}%"></div></div><input class="brightness-input" type="range" min="0" max="100" step="5" id="brightness" value="${brightness}" aria-label="Luminosité" ${online?"":"disabled"}></div></label>${["clock","date","weather","gif","mqtt"].map(f=>`<label class="toggle"><input type="checkbox" data-flag="${f}" ${this._flag(f)?"checked":""} ${online?"":"disabled"}> ${this._labelFlag(f)}</label>`).join("")}</div>`; }
   _labelFlag(f) { return ({clock:"Heure",date:"Date",weather:"Météo",gif:"GIF",mqtt:"MQTT Display"})[f]; }
   _brightness() { const rows=this._display?.brightness?.schedule||[]; const h=new Date().getHours(); return rows.find(r=>r.hour===h)?.value ?? 0; }
   _displayPage() { return `<section class="card"><h2>Affichage</h2><p class="sub">Les paramètres sont appliqués via l’API transactionnelle.</p>${this._quickControls()}</section>`; }
@@ -191,7 +205,7 @@ class Rpi2dmdPanel extends HTMLElement {
   _duration(sec) { if (sec == null) return "—"; const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60); return `${h} h ${m} min`; }
   _bind() {
     this.shadowRoot.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>this._loadSection(b.dataset.nav));
-    const device=this.shadowRoot.querySelector("#device"); if(device) device.onchange=()=>{this._entry=device.value; this._loadSection(this._section);};
+    const device=this.shadowRoot.querySelector("#device"); if(device) device.onchange=()=>{this._entry=device.value; this._online=false; this._clearRuntimeData(); this._render(); this._refreshStatus();};
     this.shadowRoot.querySelectorAll("[data-flag]").forEach(el=>el.onchange=()=>this._updateDisplay({flags:{[el.dataset.flag]:el.checked}}));
     const bright=this.shadowRoot.querySelector("#brightness"); const brightValue=this.shadowRoot.querySelector("#brightness-value"); const brightFill=this.shadowRoot.querySelector("#brightness-fill"); if(bright){const updateVisual=()=>{const value=Number(bright.value); const min=Number(bright.min||0); const max=Number(bright.max||100); const percentage=((value-min)/(max-min))*100; if(brightValue) brightValue.textContent=`${value} %`; if(brightFill) brightFill.style.width=`${percentage}%`;}; updateVisual(); bright.addEventListener("input",updateVisual); bright.onchange=()=>this._updateDisplay({brightness:{schedule:[{hour:new Date().getHours(),value:Number(bright.value)}]}});}
     this.shadowRoot.querySelector("[data-action=retry]")?.addEventListener("click",()=>this._refreshStatus());
