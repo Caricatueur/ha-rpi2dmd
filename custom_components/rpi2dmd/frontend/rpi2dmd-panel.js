@@ -33,6 +33,8 @@ class Rpi2dmdPanel extends HTMLElement {
     this._weather = null;
     this._gifs = null;
     this._gifCategories = null;
+    this._gifLoading = false;
+    this._featureErrors = {};
     this._brightnessSchedule = { enabled: true, points: [] };
     this._iconPickerOpen = false;
     this._iconPickerTarget = null;
@@ -94,19 +96,37 @@ class Rpi2dmdPanel extends HTMLElement {
   _clearRuntimeData() { this._status=null; this._display=null; this._playlist=null; this._mqtt=null; this._weather=null; this._gifs=null; this._gifCategories=null; }
   async _loadSection(section) {
     this._section = section;
+    if (section === "gif") {
+      this._gifLoading = true;
+      this._gifs = null;
+      this._gifCategories = null;
+      this._featureErrors.gif = "";
+    }
     this._render();
     try {
       if (section === "display") this._display = (await this._ws("rpi2dmd/display/get")).display;
       if (section === "playlist") this._playlist = (await this._ws("rpi2dmd/playlist/get")).playlist;
       if (section === "mqtt") this._mqtt = (await this._ws("rpi2dmd/mqtt/get")).mqtt;
       if (section === "weather") this._weather = (await this._ws("rpi2dmd/weather/get")).weather;
-      if (section === "gif") this._gifs = (await this._ws("rpi2dmd/gifs/list", { limit: 100 })).gifs;
-      if (section === "gif") this._gifCategories = (await this._ws("rpi2dmd/gifs/categories")).categories;
+      if (section === "gif") {
+        this._gifs = (await this._ws("rpi2dmd/gifs/list", { limit: 100 })).gifs;
+        this._gifCategories = (await this._ws("rpi2dmd/gifs/categories")).categories;
+      }
       if (section === "brightness") { const raw=(await this._ws("rpi2dmd/brightness/schedule/get")).schedule || {}; this._brightnessSchedule = raw.points ? raw : { enabled: true, points: Array.isArray(raw)?raw:(raw.schedule||[]) }; }
       if (section === "system") this._status = (await this._ws("rpi2dmd/system")).system;
+      if (section === "gif") this._featureErrors.gif = "";
       this._render();
-    } catch (err) { this._showError(err); }
+    } catch (err) {
+      if (section === "gif") this._showFeatureError("gif", err, "Impossible de charger les GIF du RPI2DMD.");
+      else this._showFeatureError(section, err);
+    } finally {
+      if (section === "gif") {
+        this._gifLoading = false;
+        this._render();
+      }
+    }
   }
+  _showFeatureError(feature, err, userMessage = "") { this._featureErrors[feature] = userMessage || err?.message || "Erreur de chargement"; this._render(); }
   _showError(err, userMessage = "") {
     const message = err?.message || "";
     console.error("RPI2DMD Home Assistant WebSocket error", message);
@@ -197,9 +217,12 @@ class Rpi2dmdPanel extends HTMLElement {
     }).sort((a,b)=>String(a.name).localeCompare(String(b.name), undefined, {numeric:true, sensitivity:"base"}));
   }
   _gifPage() {
+    if (this._gifLoading) return `<section class="card"><h2>GIF</h2><p>Chargement des GIF…</p></section>`;
+    if (this._featureErrors.gif) return `<section class="card" role="alert"><h2>GIF</h2><p class="error">${this._esc(this._featureErrors.gif)} <button data-action="gif-retry">Réessayer</button></p></section>`;
     const g=this._gifs||{}, categories=this._gifCategoriesList();
     const total=g.total ?? categories.reduce((n,x)=>n+Number(x.count||0),0);
-    return `<section class="card"><h2>GIF</h2><p>${categories.length} dossiers · ${total} GIF disponibles</p><div class="category-list">${categories.map(x=>`<article class="category-card"><div><b>${this._esc(x.name)}</b><small>${x.count} GIF</small></div><label class="toggle">Actif <input type="checkbox" data-gif-category="${this._esc(x.id)}" ${x.enabled?"checked":""}></label></article>`).join("") || "<p>Aucune catégorie disponible.</p>"}</div></section>`;
+    const summary=categories.length||total ? `${categories.length} dossiers · ${total} GIF disponibles` : "Aucun GIF disponible.";
+    return `<section class="card"><h2>GIF</h2><p>${summary}</p><div class="category-list">${categories.map(x=>`<article class="category-card"><div><b>${this._esc(x.name)}</b><small>${x.count} GIF</small></div><label class="toggle">Actif <input type="checkbox" data-gif-category="${this._esc(x.id)}" ${x.enabled?"checked":""}></label></article>`).join("") || "<p>Aucune catégorie disponible.</p>"}</div></section>`;
   }
   _weatherPage() { const w=this._weather||{}; return `<section class="card"><h2>Météo</h2><label>Pays <input id="weather-country" value="${this._esc(w.country)}"></label><label>Code postal <input id="weather-zip" value="${this._esc(w.postal_code)}"></label><label>Unité <select id="weather-unit"><option ${w.unit==="metric"?"selected":""}>metric</option><option ${w.unit==="imperial"?"selected":""}>imperial</option></select></label><p>Clé OpenWeatherMap configurée : <b>${w.api_key_configured?"Oui":"Non"}</b></p><label>OpenWeatherMap API Key <input id="weather-api-key" type="password" value="" placeholder="Laisser vide pour conserver la clé actuelle" autocomplete="new-password"></label><button data-action="weather-save">Enregistrer</button></section>`; }
   _scheduleTime(point) { return point.time || `${String(point.hour??0).padStart(2,"0")}:00`; }
@@ -213,6 +236,7 @@ class Rpi2dmdPanel extends HTMLElement {
     this.shadowRoot.querySelectorAll("[data-flag]").forEach(el=>el.onchange=()=>this._updateDisplay({flags:{[el.dataset.flag]:el.checked}}));
     const bright=this.shadowRoot.querySelector("#brightness"); const brightValue=this.shadowRoot.querySelector("#brightness-value"); const brightFill=this.shadowRoot.querySelector("#brightness-fill"); if(bright){const updateVisual=()=>{const value=Number(bright.value); const min=Number(bright.min||0); const max=Number(bright.max||100); const percentage=((value-min)/(max-min))*100; if(brightValue) brightValue.textContent=`${value} %`; if(brightFill) brightFill.style.width=`${percentage}%`;}; updateVisual(); bright.addEventListener("input",updateVisual); bright.onchange=()=>this._updateDisplay({brightness:{schedule:[{hour:new Date().getHours(),value:Number(bright.value)}]}});}
     this.shadowRoot.querySelector("[data-action=retry]")?.addEventListener("click",()=>this._refreshStatus());
+    this.shadowRoot.querySelector("[data-action=gif-retry]")?.addEventListener("click",()=>this._loadSection("gif"));
     this.shadowRoot.querySelectorAll("[data-action=up],[data-action=down]").forEach(b=>b.onclick=()=>this._move(b.dataset.item,b.dataset.action==="up"?-1:1));
     this.shadowRoot.querySelectorAll("[data-action=duplicate]").forEach(b=>b.onclick=()=>this._playlistAction("rpi2dmd/playlist/duplicate",{item_id:b.dataset.item}));
     this.shadowRoot.querySelectorAll("[data-action=delete]").forEach(b=>b.onclick=()=>{if(confirm("Supprimer cette ligne ?"))this._playlistAction("rpi2dmd/playlist/delete",{item_id:b.dataset.item});});
