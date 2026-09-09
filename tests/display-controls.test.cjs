@@ -110,7 +110,7 @@ test('real render and bound checkbox handler update markup before any API write'
   p._bind();const change=el.onchange;
   p._render=Object.getPrototypeOf(p)._render;p._checkHeroBanner=()=>{};
   p._section='display';
-  const start=performance.now();change({isTrusted:true});
+  const start=performance.now();change({isTrusted:true,currentTarget:el});
   assert.ok(performance.now()-start<100);
   assert.doesNotMatch(p.shadowRoot.innerHTML,/data-flag="gif" checked/);
   assert.equal(calls.length,0);
