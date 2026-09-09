@@ -203,7 +203,7 @@ class Rpi2dmdPanel extends HTMLElement {
     }
     state.revision++;
     this._clearFeatureError("display");
-    this._render();
+    this._render({ displayFlagsOnly: !changes.brightness });
     // Trailing debounce; the payload is sampled only when the serialized slot opens.
     clearTimeout(state.timer);
     state.timer = setTimeout(() => this._flushDisplay(state), 250);
@@ -259,8 +259,16 @@ class Rpi2dmdPanel extends HTMLElement {
     return typeof confirmed === "boolean" ? confirmed : (this._status?.display?.active_flags || []).includes(name);
   }
   _esc(value) { return String(value ?? "").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c])); }
-  _render() {
+  _render({ displayFlagsOnly = false } = {}) {
     if (!this.shadowRoot) return;
+    if (displayFlagsOnly && this.shadowRoot.querySelector("[data-flag]") && !this.shadowRoot.querySelector(".error")) {
+      // Keep the native input being activated in place. Update its live property,
+      // rather than replacing the entire shadow DOM during the change event.
+      this.shadowRoot.querySelectorAll("[data-flag]").forEach(input => {
+        input.checked = this._flag(input.dataset.flag);
+      });
+      return;
+    }
     this.shadowRoot.innerHTML = `<style>${this._css()}${RPI_POLISH_CSS}${RPI_EXACT_HERO_CSS}${ICON_PICKER_CSS}</style><main>
       <header class="hero"><div class="hero-content"><div class="hero-overlay"><span class="online-pill ${this._online?"":"offline"}"><i></i> ${this._online ? "En ligne" : "Hors ligne"}</span><label class="device">Appareil <select id="device">${this._devices.map(d => `<option value="${this._esc(d.entry_id)}" ${d.entry_id===this._entry?"selected":""}>${this._esc(this._deviceLabel(d))}</option>`).join("")}</select></label></div></div></header>
       <nav aria-label="Navigation">${["dashboard","display","brightness","playlist","mqtt","gif","weather","system","backup"].map(s => `<button class="nav ${this._section===s?"active":""}" data-nav="${s}">${this._label(s)}</button>`).join("")}</nav>
@@ -340,7 +348,7 @@ class Rpi2dmdPanel extends HTMLElement {
   _bind() {
     this.shadowRoot.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>this._loadSection(b.dataset.nav));
     const device=this.shadowRoot.querySelector("#device"); if(device) device.onchange=()=>{this._entry=device.value; this._online=false; this._clearRuntimeData(); this._render(); this._refreshStatus();};
-    this.shadowRoot.querySelectorAll("[data-flag]").forEach(el=>el.onchange=(event)=>{if(!event.isTrusted)return;this._updateDisplay({flags:{[el.dataset.flag]:el.checked}});});
+    this.shadowRoot.querySelectorAll("[data-flag]").forEach(el=>el.onchange=(event)=>{if(!event.isTrusted)return;const input=event.currentTarget;const wanted=input.checked;this._updateDisplay({flags:{[input.dataset.flag]:wanted}});});
     const bright=this.shadowRoot.querySelector("#brightness"); const brightValue=this.shadowRoot.querySelector("#brightness-value"); const brightFill=this.shadowRoot.querySelector("#brightness-fill"); if(bright){const updateVisual=()=>{const value=Number(bright.value); const min=Number(bright.min||0); const max=Number(bright.max||100); const percentage=((value-min)/(max-min))*100; if(brightValue) brightValue.textContent=`${value} %`; if(brightFill) brightFill.style.width=`${percentage}%`;}; updateVisual(); bright.addEventListener("input",()=>{this._displayWriteState().draft=Number(bright.value);updateVisual();}); bright.onchange=(event)=>{if(!event.isTrusted)return;this._updateDisplay({brightness:{schedule:[{hour:new Date().getHours(),value:Number(bright.value)}]}});};}
     this.shadowRoot.querySelector("[data-action=retry]")?.addEventListener("click",()=>this._refreshStatus());
     this.shadowRoot.querySelector("[data-action=gif-retry]")?.addEventListener("click",()=>this._loadSection("gif"));
