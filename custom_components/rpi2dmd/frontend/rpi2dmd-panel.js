@@ -43,7 +43,7 @@ class Rpi2dmdPanel extends HTMLElement {
     this._iconSearch = "";
     this._iconCategory = "";
     this._iconPreviewCache = {};
-    this._busy = false;
+    this._displayWrites = new Map();
     this._writeTail = Promise.resolve();
     this._lastWriteAt = 0;
     this._timer = null;
@@ -66,14 +66,14 @@ class Rpi2dmdPanel extends HTMLElement {
 
   async _ws(type, extra = {}) {
     if (!this._hass || this._entry === null && type !== "rpi2dmd/devices") throw new Error("Home Assistant indisponible");
-    return this._hass.callWS({ type, ...extra, ...(type === "rpi2dmd/devices" ? {} : { entry_id: this._entry }) });
+    return this._hass.callWS({ type, ...extra, ...(type === "rpi2dmd/devices" ? {} : { entry_id: extra.entry_id ?? this._entry }) });
   }
-  async _wsWrite(type, extra = {}) {
+  async _wsWrite(type, extra = {}, entry = this._entry) {
     const run = this._writeTail.then(async () => {
       const wait = Math.max(0, 1000 - (Date.now() - this._lastWriteAt));
       if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
       try {
-        return await this._ws(type, extra);
+        return await this._ws(type, { ...(typeof extra === "function" ? extra() : extra), entry_id: entry });
       } finally {
         this._lastWriteAt = Date.now();
       }
@@ -120,6 +120,8 @@ class Rpi2dmdPanel extends HTMLElement {
       this._gifCategories = null;
     }
     this._render();
+    const displayState = this._displayWriteState();
+    const displayRevision = displayState.revision;
     let display;
     let playlist;
     let mqtt;
@@ -140,7 +142,7 @@ class Rpi2dmdPanel extends HTMLElement {
       if (section === "brightness") { const raw=(await this._ws("rpi2dmd/brightness/schedule/get")).schedule || {}; brightnessSchedule = raw.points ? raw : { enabled: true, points: Array.isArray(raw)?raw:(raw.schedule||[]) }; }
       if (section === "system") system = (await this._ws("rpi2dmd/system")).system;
       if (requestId !== this._sectionRequestId || this._section !== section) return;
-      if (section === "display") this._display = display;
+      if (section === "display" && displayState === this._displayWriteState() && displayRevision === displayState.revision) this._display = display;
       if (section === "playlist") this._playlist = playlist;
       if (section === "mqtt") this._mqtt = mqtt;
       if (section === "weather") this._weather = weather;
@@ -180,14 +182,82 @@ class Rpi2dmdPanel extends HTMLElement {
     this._noticeTimer = setTimeout(() => { this._notice = ""; this._render(); }, 4500);
     this._render();
   }
-  async _updateDisplay(changes) {
-    if (this._busy) return;
-    this._busy = true; this._render();
-    try { this._display = (await this._wsWrite("rpi2dmd/display/update", { changes })).display; this._clearFeatureError("display"); await this._refreshStatus(); }
-    catch (err) { this._showFeatureError("display", err, "Impossible d'enregistrer l'affichage."); }
-    finally { this._busy = false; this._render(); }
+  _displayWriteState() {
+    if (!this._displayWrites.has(this._entry)) this._displayWrites.set(this._entry, {
+      entry: this._entry, pending: {}, queued: {}, timer: null, running: false, revision: 0, draft: null,
+    });
+    return this._displayWrites.get(this._entry);
   }
-  _flag(name) { return (this._display?.flags || {})[name] === true || (this._status?.display?.active_flags || []).includes(name); }
+  _updateDisplay(changes) {
+    const state = this._displayWriteState();
+    const values = { ...changes.flags };
+    if (changes.brightness) {
+      values.brightness = changes.brightness;
+      state.draft = null;
+    }
+    for (const [key, value] of Object.entries(values)) {
+      const confirmed = state.pending[key]?.confirmed ?? (key === "brightness"
+        ? this._display?.brightness : this._flag(key));
+      state.pending[key] = { value, confirmed };
+      state.queued[key] = state.pending[key];
+    }
+    state.revision++;
+    this._clearFeatureError("display");
+    this._render();
+    // Trailing debounce; the payload is sampled only when the serialized slot opens.
+    clearTimeout(state.timer);
+    state.timer = setTimeout(() => this._flushDisplay(state), 250);
+  }
+  async _flushDisplay(state) {
+    if (state.running || !Object.keys(state.queued).length) return;
+    const entry = state.entry;
+    state.running = true;
+    let sent = {};
+    try {
+      const result = await this._wsWrite("rpi2dmd/display/update", () => {
+        sent = state.queued;
+        state.queued = {};
+        const changes = { flags: {} };
+        for (const [key, item] of Object.entries(sent)) {
+          if (key === "brightness") changes.brightness = item.value;
+          else changes.flags[key] = item.value;
+        }
+        if (!Object.keys(changes.flags).length) delete changes.flags;
+        return { changes };
+      }, entry);
+      state.revision++;
+      if (this._entry === entry) this._display = result.display;
+      for (const [key, item] of Object.entries(sent)) {
+        const confirmed = key === "brightness" ? result.display.brightness : result.display.flags[key];
+        if (state.pending[key] === item) delete state.pending[key];
+        else if (state.pending[key]) state.pending[key].confirmed = confirmed;
+      }
+      if (this._entry === entry) this._render();
+      // The bridge already requests a coordinator refresh after the transaction.
+      if (this._entry === entry) await this._refreshStatus();
+    } catch (err) {
+      state.revision++;
+      for (const [key, item] of Object.entries(sent)) {
+        if (this._entry === entry) {
+          this._display ||= {};
+          if (key === "brightness") this._display.brightness = item.confirmed;
+          else { this._display.flags ||= {}; this._display.flags[key] = item.confirmed; }
+        }
+        if (state.pending[key] === item) delete state.pending[key];
+      }
+      if (this._entry === entry) this._showFeatureError("display", err,
+        `Impossible de modifier ${Object.keys(sent).map(key => key === "brightness" ? "la luminosité" : this._labelFlag(key)).join(", ")}.`);
+    } finally {
+      state.running = false;
+      if (Object.keys(state.queued).length) this._flushDisplay(state);
+    }
+  }
+  _flag(name) {
+    const pending = this._displayWriteState().pending[name];
+    if (pending) return pending.value;
+    const confirmed = this._display?.flags?.[name];
+    return typeof confirmed === "boolean" ? confirmed : (this._status?.display?.active_flags || []).includes(name);
+  }
   _esc(value) { return String(value ?? "").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c])); }
   _render() {
     if (!this.shadowRoot) return;
@@ -238,7 +308,7 @@ class Rpi2dmdPanel extends HTMLElement {
   }
   _quickControls() { const online=this._online===true, brightness=online?this._brightness():0, percentage=online?((Number(brightness)-0)/(100-0))*100:0; return `<div class="controls"><label class="brightness-control"><span class="brightness-line"><span>Luminosité</span><output class="brightness-value" id="brightness-value" for="brightness">${online?`${brightness} %`:"—"}</output></span><div class="brightness-slider"><div class="brightness-track"><div class="brightness-fill" id="brightness-fill" style="width:${percentage}%"></div></div><input class="brightness-input" type="range" min="0" max="100" step="5" id="brightness" value="${brightness}" aria-label="Luminosité" ${online?"":"disabled"}></div></label>${["clock","date","weather","gif","mqtt"].map(f=>`<label class="toggle"><input type="checkbox" data-flag="${f}" ${this._flag(f)?"checked":""} ${online?"":"disabled"}> ${this._labelFlag(f)}</label>`).join("")}</div>`; }
   _labelFlag(f) { return ({clock:"Heure",date:"Date",weather:"Météo",gif:"GIF",mqtt:"MQTT Display"})[f]; }
-  _brightness() { const rows=this._display?.brightness?.schedule||[]; const h=new Date().getHours(); return rows.find(r=>r.hour===h)?.value ?? 0; }
+  _brightness() { const state=this._displayWriteState(); if(state.draft !== null)return state.draft; const rows=(state.pending.brightness?.value ?? this._display?.brightness)?.schedule||[]; const h=new Date().getHours(); return rows.find(r=>r.hour===h)?.value ?? 0; }
   _displayPage() { return `<section class="card"><h2>Affichage</h2><p class="sub">Les paramètres sont appliqués via l’API transactionnelle.</p>${this._quickControls()}</section>`; }
   _itemIcon(item) { return item.icon ?? item.icon_id ?? item.logo ?? ""; }
   _playlistPage() { const items=this._playlist?.items||[]; return `<section class="card"><div class="row"><h2>Playlist</h2><button data-action="playlist-add">Ajouter</button></div>${items.length?items.map((i,n)=>{const icon=this._itemIcon(i); const mqtt=i.type==="mqtt"; return `<article class="item ${i.enabled?"":"disabled-item"}"><div><label class="playlist-state"><input type="checkbox" data-item="${this._esc(i.id)}" data-action="toggle" ${i.enabled?"checked":""}> <b>${i.enabled?"Actif":"Inactif"} [${i.enabled?"ON":"OFF"}]</b></label><p>${n+1} — ${this._esc(i.type)} · ${this._esc(i.title||i.topic||"")} ${i.unit?`(${this._esc(i.unit)})`:""}</p>${mqtt?`<div class="mqtt-icon-field">${icon?`<img class="mqtt-icon-preview" data-icon-preview="${this._esc(icon)}" alt="Icône MQTT">`:`<span class="mqtt-icon-empty">Aucune icône</span>`}<span>Icône : <b>${this._esc(icon||"Aucune")}</b></span><button data-action="icon-picker" data-item="${this._esc(i.id)}">Choisir une icône</button>${icon?`<button data-action="icon-clear" data-item="${this._esc(i.id)}">Aucune icône</button>`:""}</div>`:""}</div><div class="actions"><button data-item="${this._esc(i.id)}" data-action="up" ${n===0?"disabled":""}>↑</button><button data-item="${this._esc(i.id)}" data-action="down" ${n===items.length-1?"disabled":""}>↓</button><button data-item="${this._esc(i.id)}" data-action="duplicate">Dupliquer</button><button data-item="${this._esc(i.id)}" data-action="delete">Supprimer</button></div></article>`;}).join(""):"<p>Aucune ligne.</p>"}</section>`; }
@@ -271,7 +341,7 @@ class Rpi2dmdPanel extends HTMLElement {
     this.shadowRoot.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>this._loadSection(b.dataset.nav));
     const device=this.shadowRoot.querySelector("#device"); if(device) device.onchange=()=>{this._entry=device.value; this._online=false; this._clearRuntimeData(); this._render(); this._refreshStatus();};
     this.shadowRoot.querySelectorAll("[data-flag]").forEach(el=>el.onchange=(event)=>{if(!event.isTrusted)return;this._updateDisplay({flags:{[el.dataset.flag]:el.checked}});});
-    const bright=this.shadowRoot.querySelector("#brightness"); const brightValue=this.shadowRoot.querySelector("#brightness-value"); const brightFill=this.shadowRoot.querySelector("#brightness-fill"); if(bright){const updateVisual=()=>{const value=Number(bright.value); const min=Number(bright.min||0); const max=Number(bright.max||100); const percentage=((value-min)/(max-min))*100; if(brightValue) brightValue.textContent=`${value} %`; if(brightFill) brightFill.style.width=`${percentage}%`;}; updateVisual(); bright.addEventListener("input",updateVisual); bright.onchange=(event)=>{if(!event.isTrusted)return;this._updateDisplay({brightness:{schedule:[{hour:new Date().getHours(),value:Number(bright.value)}]}});};}
+    const bright=this.shadowRoot.querySelector("#brightness"); const brightValue=this.shadowRoot.querySelector("#brightness-value"); const brightFill=this.shadowRoot.querySelector("#brightness-fill"); if(bright){const updateVisual=()=>{const value=Number(bright.value); const min=Number(bright.min||0); const max=Number(bright.max||100); const percentage=((value-min)/(max-min))*100; if(brightValue) brightValue.textContent=`${value} %`; if(brightFill) brightFill.style.width=`${percentage}%`;}; updateVisual(); bright.addEventListener("input",()=>{this._displayWriteState().draft=Number(bright.value);updateVisual();}); bright.onchange=(event)=>{if(!event.isTrusted)return;this._updateDisplay({brightness:{schedule:[{hour:new Date().getHours(),value:Number(bright.value)}]}});};}
     this.shadowRoot.querySelector("[data-action=retry]")?.addEventListener("click",()=>this._refreshStatus());
     this.shadowRoot.querySelector("[data-action=gif-retry]")?.addEventListener("click",()=>this._loadSection("gif"));
     this.shadowRoot.querySelectorAll("[data-action=up],[data-action=down]").forEach(b=>b.onclick=()=>this._move(b.dataset.item,b.dataset.action==="up"?-1:1));
