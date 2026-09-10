@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.util import dt as dt_util
+from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import RPI2DMDError
@@ -29,33 +29,38 @@ class RPI2DMDNumber(RPI2DMDEntity, NumberEntity):
 
     def __init__(self, coordinator) -> None:
         super().__init__(coordinator, "brightness")
-        self._value = None
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
-        await self._async_refresh_value()
+        self.async_on_remove(async_track_time_change(
+            self.hass, self._hour_changed, minute=0, second=0
+        ))
 
-    async def _async_refresh_value(self) -> None:
-        try:
-            display = await self.coordinator.api.async_get_display()
-            schedule = display.get("brightness", {}).get("schedule", [])
-            hour = datetime.now().hour
-            self._value = next((row.get("value") for row in schedule if row.get("hour") == hour), None)
-            self.async_write_ha_state()
-        except RPI2DMDError:
-            self._value = None
+    @callback
+    def _hour_changed(self, now) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.coordinator.brightness_points is not None
 
     @property
     def native_value(self):
-        return self._value if self.coordinator.last_update_success else None
+        if not self.available:
+            return None
+        time = dt_util.now().strftime("%H:00")
+        return next(
+            (point["value"] for point in reversed(self.coordinator.brightness_points)
+             if point["time"] <= time), None
+        )
 
     async def async_set_native_value(self, value: float) -> None:
-        hour = datetime.now().hour
+        hour = dt_util.now().hour
         try:
             await self.coordinator.api.async_update_display(
                 {"brightness": {"schedule": [{"hour": hour, "value": int(value)}]}}
             )
-            await self._async_refresh_value()
+            await self.coordinator.async_refresh_brightness_schedule()
             await self.coordinator.async_request_refresh()
         except RPI2DMDError as err:
             raise RuntimeError(str(err)) from err

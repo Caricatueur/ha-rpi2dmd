@@ -1,0 +1,7 @@
+# Python 3.12 test environment; real HA helpers, simulated Raspberry API.
+homeassistant==2024.12.5
+# Bound transitive Bluetooth dependencies for this HA/Python version.
+habluetooth==3.6.0
+bluetooth-data-tools==1.22.0
+pytest==9.1.1
+pytest-asyncio==1.4.0
