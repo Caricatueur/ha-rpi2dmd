@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import RPI2DMDClient, RPI2DMDError
-from .brightness import _hourly_to_points
+from .brightness import _validate_hourly
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
 
@@ -47,7 +47,11 @@ class RPI2DMDCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_refresh_brightness_schedule(self, *, notify: bool = True) -> list[dict[str, Any]]:
         """Read confirmed API values and notify the number after panel requests."""
         try:
-            points = _hourly_to_points(await self.api.async_get_brightness_schedule())
+            hourly = _validate_hourly(await self.api.async_get_brightness_schedule())
+            points = [
+                {"time": f"{row['hour']:02d}:00", "value": row["value"]}
+                for row in hourly
+            ]
         except (RPI2DMDError, ValueError):
             self.brightness_points = None
             if notify:

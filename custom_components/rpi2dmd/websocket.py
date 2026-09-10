@@ -17,7 +17,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .api import RPI2DMDAuthError, RPI2DMDConnectionError, RPI2DMDError
-from .brightness import _hourly_to_points as _hourly_to_points, _schedule_to_hourly
+from .brightness import _validate_hourly
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -190,7 +190,7 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
         return {"entry_id": entry_id, "schedule": {"enabled": enabled, "points": points}}
     if command == "rpi2dmd/brightness/schedule/update":
         enabled = bool(msg.get("enabled", True))
-        hourly_schedule = _schedule_to_hourly(msg.get("schedule", []))
+        hourly_schedule = _validate_hourly(msg.get("schedule", []), for_write=True)
         await api.async_update_brightness_schedule(hourly_schedule)
         points = await coordinator.async_refresh_brightness_schedule()
         # Replace legacy stores: HA owns only the enabled preference.
