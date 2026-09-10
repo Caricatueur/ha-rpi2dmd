@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import logging
-import re
 import time
 from typing import Any
 
@@ -18,6 +17,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .api import RPI2DMDAuthError, RPI2DMDConnectionError, RPI2DMDError
+from .brightness import _hourly_to_points as _hourly_to_points, _schedule_to_hourly
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,43 +75,6 @@ def _safe_weather(data: Mapping[str, Any]) -> dict[str, Any]:
 
 def _schedule_store(hass: HomeAssistant, entry_id: str) -> Store:
     return Store(hass, 1, f"{DOMAIN}.{entry_id}.brightness_schedule")
-
-
-def _schedule_to_hourly(points: Any) -> list[dict[str, int]]:
-    """Validate UI points and expand them to the API's 24 hourly values."""
-    if not isinstance(points, list) or not points:
-        raise ValueError("Le planning doit contenir au moins une heure.")
-    parsed: dict[int, int] = {}
-    for index, point in enumerate(points, start=1):
-        if not isinstance(point, Mapping):
-            raise ValueError(f"La ligne {index} du planning est invalide.")
-        raw_time = point.get("time")
-        if isinstance(raw_time, str):
-            match = re.fullmatch(r"([01]\d|2[0-3]):([0-5]\d)", raw_time)
-            if not match:
-                raise ValueError(f"L'heure « {raw_time} » est invalide (format HH:00 attendu).")
-            hour = int(match.group(1))
-            if match.group(2) != "00":
-                raise ValueError(f"L'heure « {raw_time} » est invalide : les minutes doivent être 00.")
-        else:
-            hour = point.get("hour")
-            if isinstance(hour, bool) or not isinstance(hour, int) or not 0 <= hour <= 23:
-                raise ValueError(f"L'heure de la ligne {index} doit être comprise entre 00:00 et 23:00.")
-        value = point.get("value")
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise ValueError(f"La luminosité de la ligne {index} doit être un entier.")
-        if not 0 <= value <= 100:
-            raise ValueError(f"La luminosité de la ligne {index} doit être comprise entre 0 et 100.")
-        if value % 5:
-            raise ValueError(f"La luminosité {value} % de la ligne {index} est invalide : utilisez un multiple de 5.")
-        if hour in parsed:
-            raise ValueError(f"Deux lignes utilisent la même heure : {hour:02d}:00.")
-        parsed[hour] = value
-    ordered = sorted(parsed.items())
-    return [
-        {"hour": hour, "value": next((value for point_hour, value in reversed(ordered) if point_hour <= hour), ordered[-1][1])}
-        for hour in range(24)
-    ]
 
 
 def _send_error(connection, msg_id: int, err: Exception) -> None:
@@ -222,18 +185,16 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
         return {"entry_id": entry_id, "categories": await api.async_update_gif_categories(msg.get("enabled_ids", []))}
     if command == "rpi2dmd/brightness/schedule/get":
         stored = await _schedule_store(hass, entry_id).async_load() or {}
-        remote = await api.async_get_brightness_schedule()
-        stored_points = stored.get("points")
-        points = stored_points if isinstance(stored_points, list) else (
-            remote.get("points", remote.get("schedule", remote)) if isinstance(remote, Mapping) else remote
-        )
-        return {"entry_id": entry_id, "schedule": {"enabled": stored.get("enabled", True), "points": points if isinstance(points, list) else []}}
+        points = await coordinator.async_refresh_brightness_schedule()
+        enabled = stored.get("enabled", True) if isinstance(stored, Mapping) else True
+        return {"entry_id": entry_id, "schedule": {"enabled": enabled, "points": points}}
     if command == "rpi2dmd/brightness/schedule/update":
         enabled = bool(msg.get("enabled", True))
-        points = msg.get("schedule", [])
-        hourly_schedule = _schedule_to_hourly(points)
+        hourly_schedule = _schedule_to_hourly(msg.get("schedule", []))
         await api.async_update_brightness_schedule(hourly_schedule)
-        await _schedule_store(hass, entry_id).async_save({"enabled": enabled, "points": points})
+        points = await coordinator.async_refresh_brightness_schedule()
+        # Replace legacy stores: HA owns only the enabled preference.
+        await _schedule_store(hass, entry_id).async_save({"enabled": enabled})
         return {"entry_id": entry_id, "schedule": {"enabled": enabled, "points": points}}
     if command == "rpi2dmd/weather/get":
         return {"entry_id": entry_id, "weather": _safe_weather(await api.async_get_weather())}
