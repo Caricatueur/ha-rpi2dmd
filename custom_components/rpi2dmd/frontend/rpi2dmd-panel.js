@@ -36,6 +36,8 @@ class Rpi2dmdPanel extends HTMLElement {
     this._gifLoading = false;
     this._featureErrors = {};
     this._sectionRequestId = 0;
+    this._statusRequestId = 0;
+    this._playlistRequest = null;
     this._brightnessSchedule = { enabled: true, points: [] };
     this._iconPickerOpen = false;
     this._iconPickerTarget = null;
@@ -92,9 +94,12 @@ class Rpi2dmdPanel extends HTMLElement {
   }
   async _refreshStatus() {
     if (this._entry === null) return;
+    const entry = this._entry;
+    const requestId = ++this._statusRequestId;
     const wasOnline = this._online;
     try {
       const result = await this._ws("rpi2dmd/status");
+      if (entry !== this._entry || requestId !== this._statusRequestId) return;
       this._online = result.online === true || result.available === true;
       this._status = this._online ? (result.status || {}) : null;
       if (!this._online) {
@@ -104,15 +109,25 @@ class Rpi2dmdPanel extends HTMLElement {
       this._render();
       if (this._online && !wasOnline && this._section !== "dashboard") await this._loadSection(this._section);
     } catch (err) {
+      if (entry !== this._entry || requestId !== this._statusRequestId) return;
       this._online = false;
       this._clearRuntimeData();
       this._showError(err, "Impossible de joindre le RPI2DMD. Les données temps réel sont temporairement indisponibles.");
     }
   }
-  _clearRuntimeData() { this._status=null; this._display=null; this._playlist=null; this._mqtt=null; this._weather=null; this._gifs=null; this._gifCategories=null; }
+  _clearRuntimeData() { ++this._sectionRequestId; this._playlistRequest=null; this._status=null; this._display=null; this._playlist=null; this._mqtt=null; this._weather=null; this._gifs=null; this._gifCategories=null; }
+  _playlistLoading() {
+    return this._playlistRequest?.entry === this._entry && this._playlistRequest?.requestId === this._sectionRequestId;
+  }
+  _refreshPlaylist() {
+    if (this._section !== "playlist" || this._playlistLoading()) return;
+    return this._loadSection("playlist");
+  }
   async _loadSection(section) {
+    const entry = this._entry;
     const requestId = ++this._sectionRequestId;
     this._section = section;
+    if (section === "playlist") this._playlistRequest = { entry, requestId };
     this._featureErrors[section] = "";
     if (section === "gif") {
       this._gifLoading = true;
@@ -141,7 +156,7 @@ class Rpi2dmdPanel extends HTMLElement {
       }
       if (section === "brightness") { const raw=(await this._ws("rpi2dmd/brightness/schedule/get")).schedule || {}; brightnessSchedule = raw.points ? raw : { enabled: true, points: Array.isArray(raw)?raw:(raw.schedule||[]) }; }
       if (section === "system") system = (await this._ws("rpi2dmd/system")).system;
-      if (requestId !== this._sectionRequestId || this._section !== section) return;
+      if (entry !== this._entry || requestId !== this._sectionRequestId || this._section !== section) return;
       if (section === "display" && displayState === this._displayWriteState() && displayRevision === displayState.revision) this._display = display;
       if (section === "playlist") this._playlist = playlist;
       if (section === "mqtt") this._mqtt = mqtt;
@@ -153,10 +168,15 @@ class Rpi2dmdPanel extends HTMLElement {
       if (this._online) this._clearError();
       this._render();
     } catch (err) {
-      if (requestId !== this._sectionRequestId || this._section !== section) return;
+      if (entry !== this._entry || requestId !== this._sectionRequestId || this._section !== section) return;
       if (section === "gif") this._showFeatureError("gif", err, "Impossible de charger les GIF du RPI2DMD.");
+      else if (section === "playlist") this._showFeatureError("playlist", err, "Impossible de charger la playlist.");
       else this._showFeatureError(section, err);
     } finally {
+      if (section === "playlist" && this._playlistRequest?.entry === entry && this._playlistRequest?.requestId === requestId) {
+        this._playlistRequest = null;
+        if (entry === this._entry && requestId === this._sectionRequestId && this._section === section) this._render();
+      }
       if (section === "gif" && requestId === this._sectionRequestId && this._section === section) {
         this._gifLoading = false;
         this._render();
@@ -310,8 +330,10 @@ class Rpi2dmdPanel extends HTMLElement {
     const displayKnown=display.service_state!=null||typeof display.paused==="boolean";
     const mqttKnown=typeof mqtt.connected==="boolean";
     const powerKnown=typeof power.undervoltage==="boolean"||typeof power.undervoltage_now==="boolean"||power.throttled_code!=null;
-    const screenKnown=screen.available===true;
-    return `<section class="grid cards">${this._card("DISPLAY",online&&displayKnown?(display.service_state||"—"):"—",online&&displayKnown?(display.paused===true?"En pause":display.service_state?"Actif":"—"):"—","▣")}${this._card("MQTT",online&&mqttKnown?(mqtt.connected?"Connecté":"Déconnecté"):"—",online&&mqttKnown?(mqtt.state||"—"):"—","↯")}${this._card("TEMPÉRATURE",online&&s.cpu_temperature_c!=null?`${s.cpu_temperature_c} °C`:"—","CPU","℃")}${this._card("ALIMENTATION",online&&powerKnown?(power.undervoltage||power.undervoltage_now?"⚠ Sous-tension":"OK"):"—",online&&powerKnown?(power.throttled_code||"—"):"—","⚡")}${this._card("ÉCRAN ACTUEL",online&&screen.available===true?(screen.id||screen.type||"—"):"—",online&&screenKnown?(playlist.mode||"—"):"—","◈")}${this._card("UPTIME",online&&s.uptime_seconds!=null?this._duration(s.uptime_seconds):"—","Raspberry Pi","◷")}</section>
+    const currentMode=online && ["legacy", "playlist"].includes(playlist.mode) ? playlist.mode.toUpperCase() : "—";
+    const currentType=online && screen.available!==false && typeof screen.type==="string" ? screen.type.trim() : "";
+    const currentDetail=currentType ? this._esc(currentType) : currentMode!=="—" ? "Mode actuel" : "—";
+    return `<section class="grid cards">${this._card("DISPLAY",online&&displayKnown?(display.service_state||"—"):"—",online&&displayKnown?(display.paused===true?"En pause":display.service_state?"Actif":"—"):"—","▣")}${this._card("MQTT",online&&mqttKnown?(mqtt.connected?"Connecté":"Déconnecté"):"—",online&&mqttKnown?(mqtt.state||"—"):"—","↯")}${this._card("TEMPÉRATURE",online&&s.cpu_temperature_c!=null?`${s.cpu_temperature_c} °C`:"—","CPU","℃")}${this._card("ALIMENTATION",online&&powerKnown?(power.undervoltage||power.undervoltage_now?"⚠ Sous-tension":"OK"):"—",online&&powerKnown?(power.throttled_code||"—"):"—","⚡")}${this._card("ÉCRAN ACTUEL",currentMode,currentDetail,"◈")}${this._card("UPTIME",online&&s.uptime_seconds!=null?this._duration(s.uptime_seconds):"—","Raspberry Pi","◷")}</section>
       ${online&&power.undervoltage?`<p class="warning" role="alert">⚠ SOUS-TENSION DÉTECTÉE — code ${this._esc(power.throttled_code)}</p>`:""}<section class="card quick"><h2>Contrôles rapides</h2>${this._quickControls()}</section>`;
   }
   _quickControls() { const online=this._online===true, brightness=online?this._brightness():0, percentage=online?((Number(brightness)-0)/(100-0))*100:0; return `<div class="controls"><label class="brightness-control"><span class="brightness-line"><span>Luminosité</span><output class="brightness-value" id="brightness-value" for="brightness">${online?`${brightness} %`:"—"}</output></span><div class="brightness-slider"><div class="brightness-track"><div class="brightness-fill" id="brightness-fill" style="width:${percentage}%"></div></div><input class="brightness-input" type="range" min="0" max="100" step="5" id="brightness" value="${brightness}" aria-label="Luminosité" ${online?"":"disabled"}></div></label>${["clock","date","weather","gif","mqtt"].map(f=>`<label class="toggle"><input type="checkbox" data-flag="${f}" ${this._flag(f)?"checked":""} ${online?"":"disabled"}> ${this._labelFlag(f)}</label>`).join("")}</div>`; }
@@ -319,7 +341,7 @@ class Rpi2dmdPanel extends HTMLElement {
   _brightness() { const state=this._displayWriteState(); if(state.draft !== null)return state.draft; const rows=(state.pending.brightness?.value ?? this._display?.brightness)?.schedule||[]; const h=new Date().getHours(); return rows.find(r=>r.hour===h)?.value ?? 0; }
   _displayPage() { return `<section class="card"><h2>Affichage</h2><p class="sub">Les paramètres sont appliqués via l’API transactionnelle.</p>${this._quickControls()}</section>`; }
   _itemIcon(item) { return item.icon ?? item.icon_id ?? item.logo ?? ""; }
-  _playlistPage() { const items=this._playlist?.items||[]; return `<section class="card"><div class="row"><h2>Playlist</h2><button data-action="playlist-add">Ajouter</button></div>${items.length?items.map((i,n)=>{const icon=this._itemIcon(i); const mqtt=i.type==="mqtt"; return `<article class="item ${i.enabled?"":"disabled-item"}"><div><label class="playlist-state"><input type="checkbox" data-item="${this._esc(i.id)}" data-action="toggle" ${i.enabled?"checked":""}> <b>${i.enabled?"Actif":"Inactif"} [${i.enabled?"ON":"OFF"}]</b></label><p>${n+1} — ${this._esc(i.type)} · ${this._esc(i.title||i.topic||"")} ${i.unit?`(${this._esc(i.unit)})`:""}</p>${mqtt?`<div class="mqtt-icon-field">${icon?`<img class="mqtt-icon-preview" data-icon-preview="${this._esc(icon)}" alt="Icône MQTT">`:`<span class="mqtt-icon-empty">Aucune icône</span>`}<span>Icône : <b>${this._esc(icon||"Aucune")}</b></span><button data-action="icon-picker" data-item="${this._esc(i.id)}">Choisir une icône</button>${icon?`<button data-action="icon-clear" data-item="${this._esc(i.id)}">Aucune icône</button>`:""}</div>`:""}</div><div class="actions"><button data-item="${this._esc(i.id)}" data-action="up" ${n===0?"disabled":""}>↑</button><button data-item="${this._esc(i.id)}" data-action="down" ${n===items.length-1?"disabled":""}>↓</button><button data-item="${this._esc(i.id)}" data-action="duplicate">Dupliquer</button><button data-item="${this._esc(i.id)}" data-action="delete">Supprimer</button></div></article>`;}).join(""):"<p>Aucune ligne.</p>"}</section>`; }
+  _playlistPage() { const items=this._playlist?.items||[]; return `<section class="card"><div class="row"><h2>Playlist</h2><div class="actions"><button data-action="playlist-refresh" ${this._playlistLoading()?"disabled":""}>${this._playlistLoading()?"Chargement…":"Rafraîchir"}</button><button data-action="playlist-add">Ajouter</button></div></div>${items.length?items.map((i,n)=>{const icon=this._itemIcon(i); const mqtt=i.type==="mqtt"; return `<article class="item ${i.enabled?"":"disabled-item"}"><div><label class="playlist-state"><input type="checkbox" data-item="${this._esc(i.id)}" data-action="toggle" ${i.enabled?"checked":""}> <b>${i.enabled?"Actif":"Inactif"} [${i.enabled?"ON":"OFF"}]</b></label><p>${n+1} — ${this._esc(i.type)} · ${this._esc(i.title||i.topic||"")} ${i.unit?`(${this._esc(i.unit)})`:""}</p>${mqtt?`<div class="mqtt-icon-field">${icon?`<img class="mqtt-icon-preview" data-icon-preview="${this._esc(icon)}" alt="Icône MQTT">`:`<span class="mqtt-icon-empty">Aucune icône</span>`}<span>Icône : <b>${this._esc(icon||"Aucune")}</b></span><button data-action="icon-picker" data-item="${this._esc(i.id)}">Choisir une icône</button>${icon?`<button data-action="icon-clear" data-item="${this._esc(i.id)}">Aucune icône</button>`:""}</div>`:""}</div><div class="actions"><button data-item="${this._esc(i.id)}" data-action="up" ${n===0?"disabled":""}>↑</button><button data-item="${this._esc(i.id)}" data-action="down" ${n===items.length-1?"disabled":""}>↓</button><button data-item="${this._esc(i.id)}" data-action="duplicate">Dupliquer</button><button data-item="${this._esc(i.id)}" data-action="delete">Supprimer</button></div></article>`;}).join(""):"<p>Aucune ligne.</p>"}</section>`; }
   _iconItems() { const raw=this._icons?.items||this._icons?.icons||this._icons||[]; return (Array.isArray(raw)?raw:[]).map(x=>typeof x==="string"?{id:x,name:x,category:""}:{id:x.id??x.name??x.icon,name:x.name??x.label??x.id,category:x.category??x.group??""}).filter(x=>x.id); }
   _iconPickerMarkup() { const items=this._iconItems(), supplied=Array.isArray(this._icons?.categories)?this._icons.categories:[], cats=[...new Set([...items.map(x=>x.category),...supplied].filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b))); const filtered=items.filter(x=>(!this._iconSearch||`${x.name} ${x.id} ${x.category}`.toLowerCase().includes(this._iconSearch.toLowerCase()))&&(!this._iconCategory||x.category===this._iconCategory)); return `<div class="icon-picker-backdrop" role="presentation"><section class="icon-picker card" role="dialog" aria-label="Choisir une icône"><div class="row"><h2>Choisir une icône</h2><button data-action="icon-close" aria-label="Fermer">×</button></div><div class="icon-filters"><input id="icon-search" type="search" placeholder="Rechercher une icône…" value="${this._esc(this._iconSearch)}"><select id="icon-category"><option value="">Toutes les catégories</option>${cats.map(c=>`<option value="${this._esc(c)}" ${c===this._iconCategory?"selected":""}>${this._esc(c)}</option>`).join("")}</select></div><button data-action="icon-select-none">Aucune icône</button><div class="icon-grid">${filtered.map(x=>`<button class="icon-option" data-action="icon-select" data-icon-id="${this._esc(x.id)}"><span class="icon-tile">${this._iconPreviewCache[x.id]?`<img loading="lazy" src="${this._iconPreviewCache[x.id]}" alt="">`:`<span aria-hidden="true">PNG</span>`}</span><b>${this._esc(x.name)}</b>${x.category?`<small>${this._esc(x.category)}</small>`:""}</button>`).join("")||"<p>Aucune icône trouvée.</p>"}</div></section></div>`; }
   _mqttPage() { const online=this._online===true, m=this._mqtt||{}; return `<section class="card"><h2>MQTT</h2><p>État : ${online?(this._status?.mqtt?.connected?"Connecté":"Déconnecté"):"—"}</p><p>Password configuré : ${online?(m.password_configured?"oui":"non"):"—"}</p><label>Broker <input id="broker" value="${this._esc(m.broker)}" ${online?"":"disabled"}></label><label>Port <input id="mqtt-port" type="number" value="${m.port||1883}" ${online?"":"disabled"}></label><label>Username <input id="mqtt-user" value="${this._esc(m.username)}" ${online?"":"disabled"}></label><label>Client ID <input id="mqtt-client" value="${this._esc(m.client_id)}" ${online?"":"disabled"}></label><label>Password <input id="mqtt-password" type="password" value="" placeholder="Laisser vide pour conserver" ${online?"":"disabled"}></label><button data-action="mqtt-save" ${online?"":"disabled"}>Enregistrer</button> <button data-action="mqtt-test" ${online?"":"disabled"}>Tester la connexion</button></section>`; }
@@ -346,6 +368,7 @@ class Rpi2dmdPanel extends HTMLElement {
   _backupPage() { return `<section class="card"><h2>Sauvegarde</h2><p>Les exports sont sans secrets ni assets.</p><button data-action="export">Exporter configuration</button><label class="file">Importer configuration <input id="import" type="file" accept="application/json"></label><p id="import-result"></p></section>`; }
   _duration(sec) { if (sec == null) return "—"; const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60); return `${h} h ${m} min`; }
   _bind() {
+    this.shadowRoot.querySelector("[data-action=playlist-refresh]")?.addEventListener("click",()=>this._refreshPlaylist());
     this.shadowRoot.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>this._loadSection(b.dataset.nav));
     const device=this.shadowRoot.querySelector("#device"); if(device) device.onchange=()=>{this._entry=device.value; this._online=false; this._clearRuntimeData(); this._render(); this._refreshStatus();};
     this.shadowRoot.querySelectorAll("[data-flag]").forEach(el=>el.onchange=(event)=>{if(!event.isTrusted)return;const input=event.currentTarget;const wanted=input.checked;this._updateDisplay({flags:{[input.dataset.flag]:wanted}});});
