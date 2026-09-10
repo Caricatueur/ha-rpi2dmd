@@ -42,8 +42,8 @@ def _schedule_to_hourly(points: Any) -> list[dict[str, int]]:
     ]
 
 
-def _hourly_to_points(remote: Any) -> list[dict[str, Any]]:
-    """Validate a complete remote day, sort it and retain value changes.
+def _validate_hourly(remote: Any, *, for_write: bool = False) -> list[dict[str, int]]:
+    """Validate and sort a complete day without filling or compressing hours.
 
     Never fill missing hours with local values: an incomplete response is an
     error, not a confirmed schedule. Preserve all integer API percentages.
@@ -52,8 +52,6 @@ def _hourly_to_points(remote: Any) -> list[dict[str, Any]]:
         remote = remote.get("schedule", remote.get("points"))
     if not isinstance(remote, list) or not remote:
         raise ValueError("Le Raspberry a retourné un planning vide ou invalide.")
-    if all(isinstance(row, Mapping) and "time" in row for row in remote):
-        remote = _schedule_to_hourly(remote)
     hours = {}
     for row in remote:
         if not isinstance(row, Mapping):
@@ -63,11 +61,25 @@ def _hourly_to_points(remote: Any) -> list[dict[str, Any]]:
             raise ValueError("Heure Raspberry invalide ou dupliquée.")
         if type(value) is not int or not 0 <= value <= 100:
             raise ValueError("Luminosité Raspberry invalide.")
+        if for_write and value % 5:
+            raise ValueError("La luminosité doit être un multiple de 5.")
         hours[hour] = value
     if len(hours) != 24:
         raise ValueError("Le planning Raspberry doit contenir les 24 heures.")
+    return [{"hour": hour, "value": hours[hour]} for hour in range(24)]
+
+
+def _hourly_to_points(remote: Any) -> list[dict[str, Any]]:
+    """Legacy change-point conversion; not used for the hourly UI."""
+    if isinstance(remote, Mapping):
+        remote = remote.get("schedule", remote.get("points"))
+    if isinstance(remote, list) and remote and all(
+        isinstance(row, Mapping) and "time" in row for row in remote
+    ):
+        remote = _schedule_to_hourly(remote)
+    hourly = _validate_hourly(remote)
     return [
-        {"time": f"{hour:02d}:00", "value": hours[hour]}
-        for hour in range(24)
-        if hour == 0 or hours[hour] != hours[hour - 1]
+        {"time": f"{row['hour']:02d}:00", "value": row["value"]}
+        for hour, row in enumerate(hourly)
+        if hour == 0 or row["value"] != hourly[hour - 1]["value"]
     ]

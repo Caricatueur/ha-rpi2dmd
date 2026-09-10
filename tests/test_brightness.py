@@ -12,13 +12,15 @@ from homeassistant.util import dt as dt_util
 
 from custom_components.rpi2dmd import websocket
 from custom_components.rpi2dmd.api import RPI2DMDConnectionError
-from custom_components.rpi2dmd.brightness import _hourly_to_points, _schedule_to_hourly
+from custom_components.rpi2dmd.brightness import _hourly_to_points, _schedule_to_hourly, _validate_hourly
 from custom_components.rpi2dmd.coordinator import RPI2DMDCoordinator
 from custom_components.rpi2dmd.number import RPI2DMDNumber
 
 POINTS = [dict(time=t, value=v) for t, v in
           [('00:00', 0), ('08:00', 50), ('14:00', 25), ('16:00', 50), ('23:00', 40)]]
 HOURLY = [dict(hour=h, value=v) for h, v in enumerate([0]*8+[50]*6+[25]*2+[50]*7+[40])]
+
+ROWS = [{"time": f"{r['hour']:02d}:00", "value": r["value"]} for r in HOURLY]
 
 
 @pytest_asyncio.fixture
@@ -75,11 +77,11 @@ def test_write_validation(bad):
 @pytest.mark.asyncio
 async def test_get_remote_over_legacy_store_and_external_change(runtime):
     _, api, coordinator, store = runtime
-    assert (await call(runtime, 'get'))['schedule'] == {'enabled': False, 'points': POINTS}
+    assert (await call(runtime, 'get'))['schedule'] == {'enabled': False, 'points': ROWS}
     changed = [{'hour': h, 'value': 75} for h in range(24)]
     api.async_get_brightness_schedule.return_value = {'schedule': changed}
-    assert (await call(runtime, 'get'))['schedule']['points'] == [{'time': '00:00', 'value': 75}]
-    assert coordinator.brightness_points == [{'time': '00:00', 'value': 75}]
+    assert (await call(runtime, 'get'))['schedule']['points'] == [{**row, 'value': 75} for row in ROWS]
+    assert coordinator.brightness_points == [{**row, 'value': 75} for row in ROWS]
     store.async_save.assert_not_called()
 
 
@@ -96,13 +98,13 @@ async def test_update_write_read_confirm_and_legacy_migration(runtime):
         return api.async_get_brightness_schedule.return_value
     api.async_update_brightness_schedule.side_effect = write
     api.async_get_brightness_schedule.side_effect = read
-    assert (await call(runtime, 'update', schedule=POINTS, enabled=True))['schedule'] == {'enabled': True, 'points': POINTS}
+    assert (await call(runtime, 'update', schedule=HOURLY, enabled=True))['schedule'] == {'enabled': True, 'points': ROWS}
     assert calls == ['write', 'read']
     store.async_save.assert_awaited_once_with({'enabled': True})
     # Firmware normalization must win over the submitted form.
     api.async_update_brightness_schedule.side_effect = None
     api.async_get_brightness_schedule.return_value = {'schedule': [{'hour': h, 'value': 20} for h in range(24)]}
-    assert (await call(runtime, 'update', schedule=POINTS))['schedule']['points'] == [{'time': '00:00', 'value': 20}]
+    assert (await call(runtime, 'update', schedule=HOURLY))['schedule']['points'] == [{**row, 'value': 20} for row in ROWS]
 
 
 @pytest.mark.asyncio
@@ -112,7 +114,7 @@ async def test_update_failure_no_false_confirmation(runtime, stage):
     method = api.async_update_brightness_schedule if stage == 'write' else api.async_get_brightness_schedule
     method.side_effect = RPI2DMDConnectionError('offline')
     with pytest.raises(RPI2DMDConnectionError):
-        await call(runtime, 'update', schedule=POINTS)
+        await call(runtime, 'update', schedule=HOURLY)
     store.async_save.assert_not_called()
     if stage == 'write':
         api.async_get_brightness_schedule.assert_not_called()
@@ -187,3 +189,38 @@ async def test_hour_callback_and_panel_get_notify_entity(runtime):
         await call(runtime, 'get')
         entity.async_write_ha_state.assert_called_once()
         await entity.async_will_remove_from_hass()
+
+
+@pytest.mark.asyncio
+async def test_full_day_and_hour_14_web_then_ha(runtime):
+    _, api, _, _ = runtime
+    result = (await call(runtime, 'get'))['schedule']['points']
+    assert len(result) == 24
+    assert [row['time'] for row in result] == [f'{hour:02d}:00' for hour in range(24)]
+    api.async_get_brightness_schedule.return_value['schedule'][14]['value'] = 100
+    assert (await call(runtime, 'get'))['schedule']['points'][14]['value'] == 100
+    submitted = deepcopy(HOURLY)
+    submitted[14]['value'] = 0
+    submitted[23]['value'] = 100
+    async def write(schedule):
+        api.async_get_brightness_schedule.return_value = {'schedule': deepcopy(schedule)}
+    api.async_update_brightness_schedule.side_effect = write
+    confirmed = (await call(runtime, 'update', schedule=submitted))['schedule']['points']
+    api.async_update_brightness_schedule.assert_awaited_once_with(submitted)
+    assert confirmed[14]['value'] == 0
+    assert confirmed[23]['value'] == 100
+    assert len(confirmed) == 24
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('bad', [HOURLY[:-1], HOURLY+[HOURLY[0]], HOURLY[:-1]+[HOURLY[0]],
+    [{'hour': 0, 'value': 42}]+HOURLY[1:], POINTS])
+async def test_hourly_update_rejects_missing_duplicate_or_invalid_values(runtime, bad):
+    with pytest.raises(ValueError):
+        await call(runtime, 'update', schedule=bad)
+    runtime[1].async_update_brightness_schedule.assert_not_called()
+
+
+def test_full_remote_validation_preserves_all_hours():
+    assert _validate_hourly({'schedule': list(reversed(HOURLY))}) == HOURLY
+    assert len(_validate_hourly([{'hour': h, 'value': 42} for h in range(24)])) == 24
