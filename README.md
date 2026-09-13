@@ -151,6 +151,4 @@ sans utiliser SSH ou PuTTY.
 
 Version actuelle : **0.2.1**.
 
-Les fonctions principales et l'intégration native sont opérationnelles. Le
-panel Home Assistant est encore en cours de finalisation et aucune release
-stable 1.0 n'est annoncée.
+Les fonctions principales et l'intégration native sont opérationnelles.
