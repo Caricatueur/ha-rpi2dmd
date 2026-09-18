@@ -210,3 +210,11 @@ Les fonctions principales et l'intégration native sont opérationnelles.
 
 ![Sauvegarde RPI2DMD](docs/screenshots/sauvegarde.png)
 
+### Appairage
+
+![Appairage RPI2DMD](docs/screenshots/appairage.png)
+
+### RPI2DMD
+
+![RPI2DMD](docs/screenshots/rpi2dmd.png)
+
