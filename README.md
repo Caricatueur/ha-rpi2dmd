@@ -164,7 +164,7 @@ sans utiliser SSH ou PuTTY.
 
 ## Compatibilité
 
-- RPI2DMD V2.8 : requis ;
+- RPI2DMD V2.8 : requis ; pas encore diffusé
 - Home Assistant : custom integration installable via HACS ;
 - Raspberry Pi 4 : testé physiquement ;
 - Raspberry Pi Zero 2 W : fonctionnement RPI2DMD qualifié ;
