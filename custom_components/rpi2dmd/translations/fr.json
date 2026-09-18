@@ -3,21 +3,57 @@
     "step": {
       "user": {
         "title": "Ajouter RPI2DMD",
-        "description": "Connectez-vous à l'API RPI2DMD V2.8.",
+        "description": "Une demande affichera un code temporaire sur votre écran RPI2DMD.",
         "data": {
-          "host": "Adresse RPI2DMD",
-          "token": "Token API"
+          "host": "Adresse RPI2DMD"
         }
+      },
+      "pairing": {
+        "title": "Associer RPI2DMD",
+        "description": "Saisissez les six chiffres du DMD. Si le code a expiré, cochez « Demander un nouveau code » et confirmez à l’étape suivante ; le champ code peut alors rester vide.",
+        "data": {
+          "pairing_code": "Code d’association",
+          "restart_pairing": "Demander un nouveau code"
+        }
+      },
+      "discovery_confirm": {
+        "title": "RPI2DMD détecté",
+        "description": "Associer {name} ? La confirmation demandera un code sur son écran physique."
+      },
+      "reauth_confirm": {
+        "title": "Réassocier RPI2DMD",
+        "description": "Le RPI2DMD a refusé l’authentification. Confirmez pour demander un code sur le DMD et renouveler l’association existante."
+      },
+      "pairing_restart": {
+        "title": "Recommencer l’association",
+        "description": "Demander un code à {name} ? Un code encore actif sera réutilisé. Ne répétez pas la demande en cas de limitation."
       }
     },
     "error": {
       "cannot_connect": "Impossible de se connecter au RPI2DMD",
-      "invalid_auth": "Token API invalide",
+      "invalid_auth": "Échec de l’authentification finale. Générez un nouveau code.",
       "unsupported_version": "Version RPI2DMD non prise en charge",
-      "unknown": "Réponse RPI2DMD inattendue"
+      "unknown": "Réponse RPI2DMD inattendue",
+      "pairing_inactive": "Code expiré ou association inactive. Demandez un nouveau code.",
+      "invalid_pairing_code": "Code invalide ou expiré. Réessayez après une seconde, ou générez un nouveau code.",
+      "pairing_timeout": "Délai de connexion dépassé. Vérifiez RPI2DMD et générez un nouveau code si nécessaire.",
+      "invalid_pairing_response": "Réponse d’association inattendue.",
+      "pairing_rate_limited": "Trop de demandes. Attendez une minute (jusqu’à quinze minutes après trois demandes).",
+      "pairing_unavailable": "Affichage du pairing indisponible. Vérifiez que RPI2DMD fonctionne.",
+      "pairing_expired": "Le code a expiré. Demandez un nouveau code.",
+      "invalid_device": "La réponse ne permet pas d’identifier un RPI2DMD compatible."
     },
     "abort": {
-      "already_configured": "Ce RPI2DMD est déjà configuré"
+      "already_configured": "Ce RPI2DMD est déjà configuré",
+      "cannot_connect": "Impossible de se connecter au RPI2DMD",
+      "unsupported_version": "Version RPI2DMD non prise en charge",
+      "invalid_device": "La réponse ne permet pas d’identifier un RPI2DMD compatible.",
+      "unknown": "Réponse RPI2DMD inattendue",
+      "pairing_timeout": "Délai de connexion dépassé. Vérifiez RPI2DMD et générez un nouveau code si nécessaire.",
+      "invalid_auth": "Échec de l’authentification finale. Générez un nouveau code.",
+      "unique_id_mismatch": "L’appareil ne correspond pas au RPI2DMD attendu.",
+      "reauth_successful": "Association renouvelée.",
+      "already_in_progress": "L’association de ce RPI2DMD est déjà en cours."
     }
   }
 }

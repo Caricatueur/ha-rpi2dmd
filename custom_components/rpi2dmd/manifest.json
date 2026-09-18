@@ -1,10 +1,16 @@
 {
   "domain": "rpi2dmd",
   "name": "RPI2DMD",
-  "version": "0.2.1",
+  "version": "0.4.0",
   "config_flow": true,
   "documentation": "https://github.com/Caricatueur/ha-rpi2dmd",
   "issue_tracker": "https://github.com/Caricatueur/ha-rpi2dmd/issues",
-  "codeowners": ["@Caricatueur"],
-  "iot_class": "local_polling"
+  "codeowners": [
+    "@Caricatueur"
+  ],
+  "iot_class": "local_polling",
+  "zeroconf": [
+    "_rpi2dmd._tcp.local."
+  ],
+  "integration_type": "device"
 }

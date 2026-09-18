@@ -9,9 +9,10 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import RPI2DMDClient, RPI2DMDError, RPI2DMDHTTPError
+from .api import RPI2DMDAuthError, RPI2DMDClient, RPI2DMDError, RPI2DMDHTTPError
 from .brightness import _validate_hourly
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
@@ -30,6 +31,7 @@ class RPI2DMDCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass,
             logging.getLogger(DOMAIN),
             name=DOMAIN,
+            config_entry=entry,
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
 
@@ -46,10 +48,18 @@ class RPI2DMDCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 status = await self.api.async_get_status()
             try:
                 await self.async_refresh_brightness_schedule(notify=False)
+            except RPI2DMDAuthError:
+                raise
             except (RPI2DMDError, ValueError):
                 # A brightness-only failure must not disable unrelated entities.
                 logging.getLogger(DOMAIN).debug("Brightness schedule refresh failed", exc_info=True)
             return status
+        except RPI2DMDAuthError:
+            # Real ConfigEntry instances use HA's auth-failure path. Lightweight
+            # test doubles retain the historical UpdateFailed behavior.
+            if isinstance(self.config_entry, ConfigEntry):
+                raise ConfigEntryAuthFailed("RPI2DMD authentication rejected") from None
+            raise UpdateFailed("RPI2DMD authentication rejected") from None
         except RPI2DMDError as err:
             raise UpdateFailed(str(err)) from err
 

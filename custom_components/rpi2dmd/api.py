@@ -6,7 +6,9 @@ import asyncio
 import base64
 import json
 import logging
+import re
 import time
+from ipaddress import IPv6Address
 from collections.abc import Mapping
 from typing import Any
 from urllib.parse import quote
@@ -26,8 +28,16 @@ class RPI2DMDConnectionError(RPI2DMDError):
     """The device could not be reached."""
 
 
+class RPI2DMDTimeoutError(RPI2DMDConnectionError):
+    """The request exceeded its time limit."""
+
+
 class RPI2DMDAuthError(RPI2DMDError):
     """The API rejected authentication."""
+
+
+class RPI2DMDPairingError(RPI2DMDError):
+    """A fixed, non-sensitive config-flow error key."""
 
 
 class RPI2DMDHTTPError(RPI2DMDError):
@@ -36,6 +46,38 @@ class RPI2DMDHTTPError(RPI2DMDError):
     def __init__(self, status: int, message: str) -> None:
         super().__init__(message)
         self.status = status
+
+
+def normalize_host(host: str, port: int | None = None) -> str:
+    """Return an HTTP authority, accepting historical hosts and bare IPv6."""
+    value = str(host).strip().rstrip("/")
+    explicit_port = None
+    try:
+        if value.startswith("["):
+            match = re.fullmatch(r"\[([^\]]+)\](?::([0-9]+))?", value)
+            if not match:
+                raise ValueError
+            address, explicit_port = match.groups()
+            IPv6Address(address)
+            authority = f"[{address}]"
+        elif value.count(":") > 1:
+            IPv6Address(value)
+            authority = f"[{value}]"
+        else:
+            match = re.fullmatch(r"([A-Za-z0-9.-]+)(?::([0-9]+))?", value)
+            if not match:
+                raise ValueError
+            authority, explicit_port = match.groups()
+        selected_port = port if port is not None else explicit_port
+        if selected_port is not None:
+            selected_port = int(selected_port)
+            if not 1 <= selected_port <= 65535:
+                raise ValueError
+            if selected_port != 80:
+                authority += f":{selected_port}"
+        return authority
+    except (TypeError, ValueError):
+        raise RPI2DMDConnectionError("Invalid RPI2DMD address") from None
 
 
 class RPI2DMDClient:
@@ -49,7 +91,7 @@ class RPI2DMDClient:
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
         self._session = session
-        self.host = host.strip().rstrip("/")
+        self.host = normalize_host(host)
         self.token = token
         self.timeout = timeout
 
@@ -91,10 +133,14 @@ class RPI2DMDClient:
                             _LOGGER.debug("GIF DEBUG request=%s endpoint=%s status=%s duration=%.2fs failure=http", method, path, response.status, time.monotonic() - started)
                         try:
                             payload = await response.json(content_type=None)
-                            message = payload.get("error", {}).get("message", "API error")
+                            error = payload.get("error") if isinstance(payload, dict) else None
+                            message = error.get("message", "API error") if isinstance(error, dict) else "API error"
                         except (ValueError, TypeError):
                             message = "API error"
-                        raise RPI2DMDHTTPError(response.status, str(message))
+                        message = message if isinstance(message, str) else "API error"
+                        if self.token:
+                            message = message.replace(self.token, "[redacted]")
+                        raise RPI2DMDHTTPError(response.status, message)
                     # Mutation endpoints may legitimately return 204 (or an
                     # empty 200/201 body). Do not require JSON when the HTTP
                     # contract intentionally has no response document.
@@ -124,13 +170,87 @@ class RPI2DMDClient:
                     return result
         except RPI2DMDError:
             raise
-        except (asyncio.TimeoutError, ClientError, OSError) as err:
+        except asyncio.TimeoutError:
+            raise RPI2DMDTimeoutError("RPI2DMD request timed out") from None
+        except (ClientError, OSError) as err:
             if gif_debug:
                 _LOGGER.debug("GIF DEBUG request=%s endpoint=%s duration=%.2fs failure=%s", method, path, time.monotonic() - started, type(err).__name__)
             raise RPI2DMDConnectionError("Unable to connect to RPI2DMD") from err
 
     async def async_get_info(self) -> dict[str, Any]:
         return await self._request("GET", "/info", authenticated=False)
+
+    async def async_pair(self, code: str) -> str:
+        """Exchange a temporary code without logging or forwarding response errors."""
+        try:
+            async with asyncio.timeout(self.timeout):
+                async with self._session.get(
+                    f"{self.base_url}/pair/status", allow_redirects=False
+                ) as response:
+                    if response.status == 429:
+                        raise RPI2DMDPairingError("pairing_rate_limited")
+                    if response.status >= 500:
+                        raise RPI2DMDPairingError("pairing_unavailable")
+                    if response.status != 200:
+                        raise RPI2DMDPairingError("pairing_inactive")
+                    state = await response.json()
+                    if not isinstance(state, dict) or not state.get("pairing_active"):
+                        raise RPI2DMDPairingError("pairing_inactive")
+                async with self._session.post(
+                    f"{self.base_url}/pair/exchange", json={"code": code},
+                    allow_redirects=False,
+                ) as response:
+                    if response.status == 429:
+                        raise RPI2DMDPairingError("pairing_rate_limited")
+                    if response.status >= 500:
+                        raise RPI2DMDPairingError("pairing_unavailable")
+                    if response.status == 410:
+                        raise RPI2DMDPairingError("pairing_expired")
+                    if response.status != 200:
+                        raise RPI2DMDPairingError("invalid_pairing_code")
+                    payload = await response.json()
+                    token = payload.get("token") if isinstance(payload, dict) else None
+                    if payload.get("success") is not True or not isinstance(token, str) or not 32 <= len(token) <= 512 or not token.isascii() or any(c.isspace() for c in token):
+                        raise RPI2DMDPairingError("invalid_pairing_response")
+                    return token
+        except RPI2DMDPairingError:
+            raise
+        except TimeoutError:
+            raise RPI2DMDPairingError("pairing_timeout") from None
+        except (ClientError, OSError):
+            raise RPI2DMDPairingError("cannot_connect") from None
+        except (ValueError, TypeError, AttributeError):
+            raise RPI2DMDPairingError("invalid_pairing_response") from None
+
+    async def async_start_pairing(self) -> None:
+        """Request the physical display only; never receive the six digits."""
+        try:
+            async with asyncio.timeout(self.timeout):
+                async with self._session.get(f"{self.base_url}/pair/status", allow_redirects=False) as response:
+                    if response.status == 429:
+                        raise RPI2DMDPairingError("pairing_rate_limited")
+                    if response.status >= 500:
+                        raise RPI2DMDPairingError("pairing_unavailable")
+                    if response.status == 200:
+                        state = await response.json()
+                        if isinstance(state, dict) and state.get("pairing_active") is True:
+                            return  # Reuse a physical code already requested from the Web.
+                async with self._session.post(f"{self.base_url}/pair/start", json={}, allow_redirects=False) as response:
+                    if response.status == 429:
+                        raise RPI2DMDPairingError("pairing_rate_limited")
+                    if response.status != 200:
+                        raise RPI2DMDPairingError("pairing_unavailable")
+                    payload = await response.json()
+                    if not isinstance(payload, dict) or payload.get("success") is not True or payload.get("pairing_active") is not True:
+                        raise RPI2DMDPairingError("pairing_unavailable")
+        except RPI2DMDPairingError:
+            raise
+        except TimeoutError:
+            raise RPI2DMDPairingError("pairing_timeout") from None
+        except (ClientError, OSError):
+            raise RPI2DMDPairingError("cannot_connect") from None
+        except (ValueError, TypeError):
+            raise RPI2DMDPairingError("pairing_unavailable") from None
 
     async def async_get_status(self) -> dict[str, Any]:
         return await self._request("GET", "/status")

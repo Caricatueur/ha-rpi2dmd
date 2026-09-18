@@ -6,6 +6,7 @@ from typing import Any
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -28,7 +29,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class RPI2DMDServiceSensor(RPI2DMDEntity, BinarySensorEntity):
     """Display or MQTT systemd service state."""
 
-    _attr_entity_category = "diagnostic"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coordinator, key: str, name: str) -> None:
         super().__init__(coordinator, key)
@@ -44,7 +45,7 @@ class RPI2DMDMQTTSensor(RPI2DMDEntity, BinarySensorEntity):
     """MQTT broker connection state."""
 
     _attr_name = "MQTT connecté"
-    _attr_entity_category = "diagnostic"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coordinator) -> None:
         super().__init__(coordinator, "mqtt_connected")
@@ -58,7 +59,7 @@ class RPI2DMDUndervoltageSensor(RPI2DMDEntity, BinarySensorEntity):
     """Current undervoltage diagnostic."""
 
     _attr_name = "Sous-tension"
-    _attr_entity_category = "diagnostic"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coordinator) -> None:
         super().__init__(coordinator, "undervoltage")

@@ -6,12 +6,16 @@ from typing import Final
 
 DOMAIN: Final = "rpi2dmd"
 NAME: Final = "RPI2DMD"
-VERSION: Final = "0.1.0"
+VERSION: Final = "0.4.0"
 DEFAULT_SCAN_INTERVAL: Final = 15
 DEFAULT_TIMEOUT: Final = 10
 API_PREFIX: Final = "/api/v1"
 CONF_HOST: Final = "host"
 CONF_TOKEN: Final = "token"
+
+# Integrators may provide one-time legacy Store migrations here when a local
+# deployment has a known historical entry. The release contains no live IDs.
+LEGACY_BRIGHTNESS_SCHEDULE_MIGRATIONS: Final = {}
 
 PLATFORMS: Final = ("binary_sensor", "sensor", "switch", "number", "button")
 

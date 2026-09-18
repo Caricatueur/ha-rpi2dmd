@@ -110,15 +110,38 @@ Un RPI2DMD V2.8 avec son API activée est nécessaire.
 
 ## Configuration
 
-Le flux de configuration demande :
+Home Assistant découvre automatiquement le service `_rpi2dmd._tcp.local.`.
+Confirmez l’appareil découvert pour demander un code sur le DMD physique, puis
+saisissez ses six chiffres. L’identité est vérifiée par `/api/v1/info`, et non
+par le seul TXT mDNS. Une nouvelle adresse du même appareil met à jour son entrée.
 
-- l'adresse IP ou le hostname du RPI2DMD ;
-- le token API RPI2DMD.
+L’ajout manuel reste disponible : saisissez une IPv4, un hostname ou une IPv6
+(avec ou sans crochets), puis utilisez le même code physique.
+
+Cette branche nécessite l'image V28 PAIRING. Le code reste valable cinq minutes,
+pour un seul échange, avec cinq erreurs maximum. Il n'est jamais affiché dans
+le Web RPI2DMD. Aucun mot de passe Web, SSH ou token à copier n'est nécessaire.
+Si le code expire, sélectionnez « Demander un nouveau code » dans le formulaire,
+puis confirmez. Aucune nouvelle demande n’est envoyée automatiquement. Les demandes sont limitées
+à une par minute et trois sur quinze minutes ; un code déjà actif est réutilisé.
 
 Exemple de format d'adresse : `192.168.x.x`.
 
 Le token est stocké dans l'entrée de configuration Home Assistant. Il n'est
 pas affiché dans le panel, les entités ou le dépôt GitHub.
+
+Les installations existantes avec un token continuent à charger sans migration
+ni nouvel appairage. Si le Raspberry refuse le token, Home Assistant propose une
+réauthentification par code physique qui met à jour la même entrée et conserve
+l’identité de l’appareil. Le firmware peut retourner un session_id au démarrage,
+mais l’échange conserve son contrat actuel : seul le code est envoyé.
+
+Le Web RPI2DMD reste ouvert sur le LAN. Un client peut demander l'affichage d'un
+code, mais les réponses publiques ne donnent ni ce code ni le token. L'accès visuel
+au DMD est la preuve attendue ; des devinettes restent possibles dans la limite
+des cinq essais. L'API HTTP existante n'est pas chiffrée : un observateur du trafic
+de pairing pourrait intercepter le code ou le token. Cette phase suppose un LAN
+de confiance ; elle n'apporte pas de protection TLS contre l'écoute ou le MITM.
 
 ## Interface Home Assistant
 
@@ -149,7 +172,19 @@ sans utiliser SSH ou PuTTY.
 
 ## État du projet
 
-Version actuelle : **0.2.x — développement**.
+Version actuelle : **0.4.0**.
+
+La version 0.4.0 ajoute la découverte Zeroconf (`_rpi2dmd._tcp.local.`), le
+pairing physique par code à six chiffres et la réauthentification. L’identité
+matérielle stable `instance_id` est conservée lors des changements d’adresse,
+avec la préférence `RPI2DMD.local`, puis IPv4, puis IPv6. Les entrées existantes
+peuvent récupérer leurs `entity_id` canoniques sans modifier leurs `unique_id`.
+Les migrations de planning de luminosité utilisent le stockage Home Assistant
+et restent idempotentes.
+
+Cible de qualification : **Home Assistant Core 2026.9.2**, Python 3.14.2
+ou supérieur. Voir `tests/requirements-ha8.txt` et le rapport HA8 pour les
+résultats effectifs ; l’ancien environnement 2024.12.5 reste historique.
 
 Les fonctions principales et l'intégration native sont opérationnelles. Le
 panel Home Assistant est encore en cours de finalisation et aucune release

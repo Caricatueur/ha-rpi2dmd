@@ -1,0 +1,4 @@
+# Separate HA8 qualification; keep the historical .venv intact.
+homeassistant==2026.9.2
+pytest==9.1.1
+pytest-asyncio==1.4.0

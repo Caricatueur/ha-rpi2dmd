@@ -225,3 +225,5 @@ __pycache__/
 .idea/
 .env
 *.log
+# Isolated HA 2026.9.2 qualification tools, interpreter and test artifacts.
+/.ha8/
