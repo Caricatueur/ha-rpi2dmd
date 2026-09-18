@@ -186,6 +186,4 @@ Cible de qualification : **Home Assistant Core 2026.9.2**, Python 3.14.2
 ou supérieur. Voir `tests/requirements-ha8.txt` et le rapport HA8 pour les
 résultats effectifs ; l’ancien environnement 2024.12.5 reste historique.
 
-Les fonctions principales et l'intégration native sont opérationnelles. Le
-panel Home Assistant est encore en cours de finalisation et aucune release
-stable 1.0 n'est annoncée.
+Les fonctions principales et l'intégration native sont opérationnelles.
