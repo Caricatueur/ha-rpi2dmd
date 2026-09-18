@@ -187,3 +187,26 @@ ou supérieur. Voir `tests/requirements-ha8.txt` et le rapport HA8 pour les
 résultats effectifs ; l’ancien environnement 2024.12.5 reste historique.
 
 Les fonctions principales et l'intégration native sont opérationnelles.
+
+## Aperçu de l’interface
+
+### Page d'accueil
+
+![Page d'accueil RPI2DMD](docs/screenshots/page_de_garde.png)
+
+### Application
+
+![Application RPI2DMD](docs/screenshots/app.png)
+
+### Liste de diffusion
+
+![Playlist RPI2DMD](docs/screenshots/playlist.png)
+
+### État du système
+
+![État du système RPI2DMD](docs/screenshots/systeme.png)
+
+### Sauvegarde
+
+![Sauvegarde RPI2DMD](docs/screenshots/sauvegarde.png)
+
