@@ -170,7 +170,6 @@ sans utiliser SSH ou PuTTY.
 - Raspberry Pi Zero 2 W : fonctionnement RPI2DMD qualifié ;
 - autres modèles : non garantis, à confirmer.
 
-## État du projet
 
 ## État du projet
 
