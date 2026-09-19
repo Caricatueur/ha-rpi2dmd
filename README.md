@@ -172,7 +172,7 @@ sans utiliser SSH ou PuTTY.
 
 ## État du projet
 
-Version actuelle : **0.4.0**.
+Version actuelle : **0.4.1**.
 
 La version 0.4.0 ajoute la découverte Zeroconf (`_rpi2dmd._tcp.local.`), le
 pairing physique par code à six chiffres et la réauthentification. L’identité

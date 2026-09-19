@@ -105,3 +105,95 @@ test('offline status invalidates in-flight playlist without repopulating runtime
   assert.equal(await page.evaluate(()=>p._playlist),null);
   assert.equal(await page.evaluate(()=>p._playlistLoading()),false);
 });
+
+async function playlistFixture(t) {
+  const page=await fixture(t);
+  await page.evaluate(()=>{
+    window.prompt=()=>{throw new Error('Unexpected prompt');};
+    p._section='playlist';p._playlist={items:[
+      {id:'first',type:'mqtt',title:'Température',enabled:true},
+      {id:'second',type:'time',enabled:false}
+    ]};p._render();
+  });
+  return page;
+}
+test('playlist type selector has exact types, defaults to MQTT and preserves draft on render',async t=>{
+  const page=await playlistFixture(t);
+  assert.deepEqual(await page.locator('#playlist-type option').evaluateAll(options=>options.map(o=>[o.value,o.textContent])),[
+    ['gif','GIF'],['time','Heure'],['date','Date'],['weather','Météo'],['mqtt','MQTT Display']
+  ]);
+  assert.equal(await page.locator('#playlist-type').inputValue(),'mqtt');
+  await page.locator('[data-playlist-field=topic]').fill('home/temperature');
+  await page.locator('#playlist-type').selectOption('gif');
+  assert.equal(await page.locator('#playlist-mqtt-fields').isVisible(),false);
+  await page.locator('#playlist-type').selectOption('mqtt');
+  await page.evaluate(()=>p._render());
+  assert.equal(await page.locator('[data-playlist-field=topic]').inputValue(),'home/temperature');
+});
+test('MQTT add sends entered fields, prevents double submit and exposes icon button after readback',async t=>{
+  const page=await playlistFixture(t);
+  for(const [field,value] of Object.entries({title:'Salon',topic:'home/salon/temperature',unit:'°C',duration_seconds:'12'}))
+    await page.locator(`[data-playlist-field=${field}]`).fill(value);
+  await page.locator('[data-action=playlist-add]').click();
+  await page.waitForFunction(()=>calls.length===1);
+  await page.evaluate(()=>p._addItem());
+  assert.equal(await page.locator('[data-action=playlist-add]').isDisabled(),true);
+  assert.deepEqual(await page.evaluate(()=>calls.map(c=>c.msg)),[{type:'rpi2dmd/playlist/add',entry_id:'a',item:{type:'mqtt',enabled:true,title:'Salon',topic:'home/salon/temperature',unit:'°C',duration_seconds:12}}]);
+  await page.evaluate(()=>calls[0].resolve({item:{id:'created'}}));
+  await page.waitForFunction(()=>calls.length===2);
+  await page.evaluate(()=>calls[1].resolve({playlist:{items:[{id:'created',...calls[0].msg.item}]}}));
+  await page.waitForFunction(()=>!p._playlistAdding);
+  assert.equal(await page.locator('[data-action=icon-picker][data-item=created]').count(),1);
+  assert.match(await page.locator('.item').innerText(),/1 — mqtt · Salon/);
+  await page.locator('[data-action=icon-picker]').click();
+  await page.waitForFunction(()=>calls.length===3);
+  assert.equal(await page.evaluate(()=>calls[2].msg.type),'rpi2dmd/icons/list');
+});
+for(const type of ['gif','time','date','weather']) test(`add ${type} keeps minimal playlist contract`,async t=>{
+  const page=await playlistFixture(t);
+  await page.locator('#playlist-type').selectOption(type);
+  await page.locator('[data-action=playlist-add]').click();
+  await page.waitForFunction(()=>calls.length===1);
+  assert.deepEqual(await page.evaluate(()=>calls[0].msg.item),{type,enabled:true});
+});
+test('unapproved type is never sent even if injected into selector',async t=>{
+  const page=await playlistFixture(t);
+  await page.evaluate(()=>{const select=p.shadowRoot.querySelector('#playlist-type');select.add(new Option('Clock','clock'));select.value='clock';return p._addItem();});
+  assert.equal(await page.evaluate(()=>calls.length),0);
+});
+for(const value of ['', '0', '-1', '1.5']) test(`invalid MQTT duration ${JSON.stringify(value)} is not sent`,async t=>{
+  const page=await playlistFixture(t);
+  await page.locator('[data-playlist-field=duration_seconds]').fill(value);
+  await page.locator('[data-action=playlist-add]').click();
+  await page.evaluate(()=>p._addItem());
+  assert.equal(await page.evaluate(()=>calls.length),0);
+});
+for(const [action,id,endpoint,extra] of [
+  ['up','second','move',{index:0}],['down','first','move',{index:1}],
+  ['duplicate','first','duplicate',{}],['delete','first','delete',{}],
+  ['toggle','first','update',{changes:{enabled:false}}],['toggle','second','update',{changes:{enabled:true}}]
+]) test(`playlist ${action} ${id} still writes and refreshes`,async t=>{
+  const page=await playlistFixture(t);
+  page.on('dialog',dialog=>dialog.accept());
+  await page.locator(`[data-action=${action}][data-item=${id}]`).click();
+  await page.waitForFunction(()=>calls.length===1);
+  assert.deepEqual(await page.evaluate(()=>calls[0].msg),{type:`rpi2dmd/playlist/${endpoint}`,entry_id:'a',item_id:id,...extra});
+  await page.evaluate(()=>calls[0].resolve({}));
+  await page.waitForFunction(()=>calls.length===2);
+  assert.equal(await page.evaluate(()=>calls[1].msg.type),'rpi2dmd/playlist/get');
+});
+test('MQTT icon update preserves icon and show_icon contract',async t=>{
+  const page=await playlistFixture(t);
+  await page.evaluate(()=>{p._setItemIcon('first','thermometer');});
+  await page.waitForFunction(()=>calls.length===1);
+  assert.deepEqual(await page.evaluate(()=>calls[0].msg),{type:'rpi2dmd/playlist/update',entry_id:'a',item_id:'first',changes:{icon:'thermometer',show_icon:true}});
+});
+test('playlist form fits mobile viewport',async t=>{
+  const page=await playlistFixture(t);
+  await page.setViewportSize({width:360,height:800});
+  const bounds=await page.locator('#playlist-add-form').boundingBox();
+  for(const input of await page.locator('#playlist-add-form input, #playlist-add-form select, #playlist-add-form button').all()) {
+    const box=await input.boundingBox();
+    assert.ok(box.x>=bounds.x && box.x+box.width<=bounds.x+bounds.width+1);
+  }
+});
