@@ -1,6 +1,9 @@
 /* RPI2DMD HA-4 panel: dependency-free Web Component.
  * All Raspberry communication goes through hass.callWS; no token or API URL
  * is ever present in this browser code. */
+const FRONTEND_VERSION = "0.4.5";
+console.info(`[RPI2DMD] frontend ${FRONTEND_VERSION} loaded`);
+
 const RPI_POLISH_CSS = `
   *{box-sizing:border-box}:host{--rpi-blue:#03a9f4;--rpi-cyan:#22d3ee;--rpi-purple:#a855f7}
   main{max-width:1280px;padding:28px clamp(16px,3vw,42px) 48px}
@@ -47,6 +50,16 @@ class Rpi2dmdPanel extends HTMLElement {
     this._iconSearch = "";
     this._iconCategory = "";
     this._iconPreviewCache = {};
+    this._iconPreviewEntry = null;
+    this._iconPreviewCaches = new Map();
+    this._iconPreviewTimer = null;
+    this._iconPreviewNextAt = 0;
+    this._iconPage = 0;
+    this._iconPreviewActive = 0;
+    this._iconPreviewPending = new Set();
+    this._iconPreviewFailed = new Set();
+    this._iconPreviewAuthBlocked = new Set();
+    this._iconPickerRequest = 0;
     this._displayWrites = new Map();
     this._writeTail = Promise.resolve();
     this._lastWriteAt = 0;
@@ -66,7 +79,7 @@ class Rpi2dmdPanel extends HTMLElement {
   get hass() { return this._hass; }
   set narrow(value) { this._narrow = value; this._render(); }
   set panel(value) { this._panel = value; }
-  disconnectedCallback() { if (this._timer) clearInterval(this._timer); this._timer = null; }
+  disconnectedCallback() { this._closeIconPicker(); if (this._timer) clearInterval(this._timer); this._timer = null; }
 
   async _ws(type, extra = {}) {
     if (!this._hass || this._entry === null && type !== "rpi2dmd/devices") throw new Error("Home Assistant indisponible");
@@ -117,7 +130,7 @@ class Rpi2dmdPanel extends HTMLElement {
       this._showError(err, "Impossible de joindre le RPI2DMD. Les données temps réel sont temporairement indisponibles.");
     }
   }
-  _clearRuntimeData() { ++this._sectionRequestId; this._playlistRequest=null; this._status=null; this._display=null; this._playlist=null; this._mqtt=null; this._weather=null; this._gifs=null; this._gifCategories=null; }
+  _clearRuntimeData() { this._closeIconPicker(); ++this._sectionRequestId; this._playlistRequest=null; this._status=null; this._display=null; this._playlist=null; this._mqtt=null; this._weather=null; this._gifs=null; this._gifCategories=null; }
   _playlistLoading() {
     return this._playlistRequest?.entry === this._entry && this._playlistRequest?.requestId === this._sectionRequestId;
   }
@@ -298,6 +311,7 @@ class Rpi2dmdPanel extends HTMLElement {
       ${this._section !== "gif" && this._featureErrors[this._section] ? `<div class="error" role="alert">${this._esc(this._featureErrors[this._section])}</div>` : ""}
       ${this._notice ? `<div class="success" role="status">${this._esc(this._notice)}</div>` : ""}
       ${this._content()}${this._iconPickerOpen ? this._iconPickerMarkup() : ""}
+      <footer class="sub"><small>Interface HA : ${FRONTEND_VERSION}</small></footer>
     </main>`;
     this._checkHeroBanner();
     this._bind();
@@ -358,7 +372,7 @@ class Rpi2dmdPanel extends HTMLElement {
   }
   _playlistPage() { const items=this._playlist?.items||[]; return `<section class="card"><div class="row"><h2>Playlist</h2><div class="actions"><button data-action="playlist-refresh" ${this._playlistLoading()?"disabled":""}>${this._playlistLoading()?"Chargement…":"Rafraîchir"}</button></div></div>${this._playlistAddForm()}${items.length?items.map((i,n)=>{const icon=this._itemIcon(i); const mqtt=i.type==="mqtt"; return `<article class="item ${i.enabled?"":"disabled-item"}"><div><label class="playlist-state"><input type="checkbox" data-item="${this._esc(i.id)}" data-action="toggle" ${i.enabled?"checked":""}> <b>${i.enabled?"Actif":"Inactif"} [${i.enabled?"ON":"OFF"}]</b></label><p>${n+1} — ${this._esc(i.type)} · ${this._esc(i.title||i.topic||"")} ${i.unit?`(${this._esc(i.unit)})`:""}</p>${mqtt?`<div class="mqtt-icon-field">${icon?`<img class="mqtt-icon-preview" data-icon-preview="${this._esc(icon)}" alt="Icône MQTT">`:`<span class="mqtt-icon-empty">Aucune icône</span>`}<span>Icône : <b>${this._esc(icon||"Aucune")}</b></span><button data-action="icon-picker" data-item="${this._esc(i.id)}">Choisir une icône</button>${icon?`<button data-action="icon-clear" data-item="${this._esc(i.id)}">Aucune icône</button>`:""}</div>`:""}</div><div class="actions"><button data-item="${this._esc(i.id)}" data-action="up" ${n===0?"disabled":""}>↑</button><button data-item="${this._esc(i.id)}" data-action="down" ${n===items.length-1?"disabled":""}>↓</button><button data-item="${this._esc(i.id)}" data-action="duplicate">Dupliquer</button><button data-item="${this._esc(i.id)}" data-action="delete">Supprimer</button></div></article>`;}).join(""):"<p>Aucune ligne.</p>"}</section>`; }
   _iconItems() { const raw=this._icons?.items||this._icons?.icons||this._icons||[]; return (Array.isArray(raw)?raw:[]).map(x=>typeof x==="string"?{id:x,name:x,category:""}:{id:x.id??x.name??x.icon,name:x.name??x.label??x.id,category:x.category??x.group??""}).filter(x=>x.id); }
-  _iconPickerMarkup() { const items=this._iconItems(), supplied=Array.isArray(this._icons?.categories)?this._icons.categories:[], cats=[...new Set([...items.map(x=>x.category),...supplied].filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b))); const filtered=items.filter(x=>(!this._iconSearch||`${x.name} ${x.id} ${x.category}`.toLowerCase().includes(this._iconSearch.toLowerCase()))&&(!this._iconCategory||x.category===this._iconCategory)); return `<div class="icon-picker-backdrop" role="presentation"><section class="icon-picker card" role="dialog" aria-label="Choisir une icône"><div class="row"><h2>Choisir une icône</h2><button data-action="icon-close" aria-label="Fermer">×</button></div><div class="icon-filters"><input id="icon-search" type="search" placeholder="Rechercher une icône…" value="${this._esc(this._iconSearch)}"><select id="icon-category"><option value="">Toutes les catégories</option>${cats.map(c=>`<option value="${this._esc(c)}" ${c===this._iconCategory?"selected":""}>${this._esc(c)}</option>`).join("")}</select></div><button data-action="icon-select-none">Aucune icône</button><div class="icon-grid">${filtered.map(x=>`<button class="icon-option" data-action="icon-select" data-icon-id="${this._esc(x.id)}"><span class="icon-tile">${this._iconPreviewCache[x.id]?`<img loading="lazy" src="${this._iconPreviewCache[x.id]}" alt="">`:`<span aria-hidden="true">PNG</span>`}</span><b>${this._esc(x.name)}</b>${x.category?`<small>${this._esc(x.category)}</small>`:""}</button>`).join("")||"<p>Aucune icône trouvée.</p>"}</div></section></div>`; }
+  _iconPickerMarkup() { const items=this._iconItems(), supplied=Array.isArray(this._icons?.categories)?this._icons.categories:[], cats=[...new Set([...items.map(x=>x.category),...supplied].filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b))); const filtered=items.filter(x=>(!this._iconSearch||`${x.name} ${x.id} ${x.category}`.toLowerCase().includes(this._iconSearch.toLowerCase()))&&(!this._iconCategory||x.category===this._iconCategory)); return `<div class="icon-picker-backdrop" role="presentation"><section class="icon-picker card" role="dialog" aria-label="Choisir une icône"><div class="row"><h2>Choisir une icône</h2><button data-action="icon-close" aria-label="Fermer">×</button></div><div class="icon-filters"><input id="icon-search" type="search" placeholder="Rechercher une icône…" value="${this._esc(this._iconSearch)}"><select id="icon-category"><option value="">Toutes les catégories</option>${cats.map(c=>`<option value="${this._esc(c)}" ${c===this._iconCategory?"selected":""}>${this._esc(c)}</option>`).join("")}</select></div><button data-action="icon-select-none">Aucune icône</button><div class="icon-grid">${filtered.slice(this._iconPage*12,(this._iconPage+1)*12).map(x=>`<button class="icon-option" data-action="icon-select" data-icon-id="${this._esc(x.id)}"><span class="icon-tile" data-picker-preview="${this._esc(x.id)}">${this._iconPreviewCache[x.id]?`<img loading="lazy" src="${this._iconPreviewCache[x.id]}" alt="">`:`<span aria-hidden="true">PNG</span>`}</span><b>${this._esc(x.name)}</b>${x.category?`<small>${this._esc(x.category)}</small>`:""}</button>`).join("")||"<p>Aucune icône trouvée.</p>"}</div><div class="actions"><button data-action="icon-prev" ${this._iconPage===0?"disabled":""}>Précédent</button><span>Page ${this._iconPage+1} / ${Math.max(1,Math.ceil(filtered.length/12))}</span><button data-action="icon-next" ${(this._iconPage+1)*12>=filtered.length?"disabled":""}>Suivant</button></div></section></div>`; }
   _mqttPage() { const online=this._online===true, m=this._mqtt||{}; return `<section class="card"><h2>MQTT</h2><p>État : ${online?(this._status?.mqtt?.connected?"Connecté":"Déconnecté"):"—"}</p><p>Password configuré : ${online?(m.password_configured?"oui":"non"):"—"}</p><label>Broker <input id="broker" value="${this._esc(m.broker)}" ${online?"":"disabled"}></label><label>Port <input id="mqtt-port" type="number" value="${m.port||1883}" ${online?"":"disabled"}></label><label>Username <input id="mqtt-user" value="${this._esc(m.username)}" ${online?"":"disabled"}></label><label>Client ID <input id="mqtt-client" value="${this._esc(m.client_id)}" ${online?"":"disabled"}></label><label>Password <input id="mqtt-password" type="password" value="" placeholder="Laisser vide pour conserver" ${online?"":"disabled"}></label><button data-action="mqtt-save" ${online?"":"disabled"}>Enregistrer</button> <button data-action="mqtt-test" ${online?"":"disabled"}>Tester la connexion</button></section>`; }
   _gifCategoriesList() {
     const raw = this._gifCategories;
@@ -402,12 +416,14 @@ class Rpi2dmdPanel extends HTMLElement {
     this.shadowRoot.querySelectorAll("[data-action=delete]").forEach(b=>b.onclick=()=>{if(confirm("Supprimer cette ligne ?"))this._playlistAction("rpi2dmd/playlist/delete",{item_id:b.dataset.item});});
     this.shadowRoot.querySelectorAll("[data-action=icon-picker]").forEach(b=>b.onclick=()=>this._openIconPicker(b.dataset.item));
     this.shadowRoot.querySelectorAll("[data-action=icon-clear]").forEach(b=>b.onclick=()=>this._setItemIcon(b.dataset.item, null));
-    this.shadowRoot.querySelectorAll("[data-icon-preview]").forEach(img=>this._loadIconPreview(img.dataset.iconPreview, img));
-    this.shadowRoot.querySelector("[data-action=icon-close]")?.addEventListener("click",()=>{this._iconPickerOpen=false;this._render();});
+    this._scheduleIconPreviews();
+    this.shadowRoot.querySelector("[data-action=icon-prev]")?.addEventListener("click",()=>{this._iconPage--;this._render();});
+    this.shadowRoot.querySelector("[data-action=icon-next]")?.addEventListener("click",()=>{this._iconPage++;this._render();});
+    this.shadowRoot.querySelector("[data-action=icon-close]")?.addEventListener("click",()=>{this._closeIconPicker();this._render();});
     this.shadowRoot.querySelector("[data-action=icon-select-none]")?.addEventListener("click",()=>this._setItemIcon(this._iconPickerTarget, null));
     this.shadowRoot.querySelectorAll("[data-action=icon-select]").forEach(b=>b.onclick=()=>this._setItemIcon(this._iconPickerTarget,b.dataset.iconId));
-    this.shadowRoot.querySelector("#icon-search")?.addEventListener("input",e=>{this._iconSearch=e.target.value;this._render();});
-    this.shadowRoot.querySelector("#icon-category")?.addEventListener("change",e=>{this._iconCategory=e.target.value;this._render();});
+    this.shadowRoot.querySelector("#icon-search")?.addEventListener("input",e=>{this._iconSearch=e.target.value;this._iconPage=0;this._render();});
+    this.shadowRoot.querySelector("#icon-category")?.addEventListener("change",e=>{this._iconCategory=e.target.value;this._iconPage=0;this._render();});
     this.shadowRoot.querySelectorAll("[data-action=toggle]").forEach(b=>b.onchange=(event)=>{if(!event.isTrusted)return;this._toggleItem(b.dataset.item, b.checked);});
     this.shadowRoot.querySelectorAll("[data-gif-category]").forEach(b=>b.onchange=(event)=>{if(!event.isTrusted)return;this._toggleGifCategory(b.dataset.gifCategory, b.checked);});
     this.shadowRoot.querySelector("#playlist-add-form")?.addEventListener("submit",event=>{event.preventDefault();this._addItem();});
@@ -428,9 +444,109 @@ class Rpi2dmdPanel extends HTMLElement {
     this.shadowRoot.querySelector("[data-action=export]")?.addEventListener("click",()=>this._export());
     this.shadowRoot.querySelector("#import")?.addEventListener("change",e=>this._import(e.target.files[0]));
   }
-  async _openIconPicker(itemId){this._iconPickerTarget=itemId;this._iconPickerOpen=true;this._iconSearch="";this._iconCategory="";this._render();try{this._icons=(await this._ws("rpi2dmd/icons/list",{limit:200})).icons||{};this._render();const items=this._iconItems();await Promise.all(items.slice(0,60).map(x=>this._loadIconPreview(x.id)));this._render();}catch(e){this._iconPickerOpen=false;this._showFeatureError("playlist",e,"Impossible de charger les icônes du RPI2DMD.");}}
-  async _loadIconPreview(iconId, target=null){if(this._iconPreviewCache[iconId]){if(target)target.src=this._iconPreviewCache[iconId];return;}try{const icon=(await this._ws("rpi2dmd/icons/get",{icon_id:iconId})).icon;const src=`data:${icon.content_type};base64,${icon.data}`;this._iconPreviewCache[iconId]=src;if(target)target.src=src;}catch(e){if(target)target.alt="Icône indisponible";}}
-  async _setItemIcon(itemId, iconId){if(!itemId)return;try{await this._wsWrite("rpi2dmd/playlist/update",{item_id:itemId,changes:{icon:iconId,show_icon:Boolean(iconId)}});this._clearFeatureError("playlist");this._iconPickerOpen=false;this._iconPickerTarget=null;await this._loadSection("playlist");}catch(e){this._showFeatureError("playlist",e,"Impossible d'enregistrer l'icône MQTT.");}}
+  _closeIconPicker() {
+    clearTimeout(this._iconPreviewTimer);
+    this._iconPreviewTimer=null;
+    this._iconPickerOpen=false;
+    this._iconPickerTarget=null;
+    ++this._iconPickerRequest;
+  }
+  async _openIconPicker(itemId) {
+    const request=++this._iconPickerRequest, entry=this._entry;
+    this._iconPickerTarget=itemId;
+    this._iconPickerOpen=true;
+    this._icons=[];
+    this._iconSearch="";
+    this._iconCategory="";
+    this._iconPage=0;
+    this._iconPreviewFailed.clear();
+    this._iconPreviewAuthBlocked.delete(entry);
+    this._render();
+    const current=()=>this._iconPickerOpen && this._iconPickerRequest===request && this._entry===entry;
+    try {
+      const result=await this._ws("rpi2dmd/icons/list",{limit:200,entry_id:entry});
+      if(!current())return;
+      this._icons=result.icons||{};
+      this._render();
+    } catch(e) {
+      if(!current())return;
+      this._closeIconPicker();
+      this._showFeatureError("playlist",e,"Impossible de charger les icônes du RPI2DMD.");
+    }
+  }
+  _paintIconPreview(iconId, src) {
+    this.shadowRoot.querySelectorAll("[data-icon-preview],[data-picker-preview]").forEach(target=>{
+      if((target.dataset.iconPreview??target.dataset.pickerPreview)!==String(iconId))return;
+      if(target.tagName==="IMG") {
+        if(src)target.src=src;
+        else target.alt="Icône indisponible";
+      } else if(src) {
+        if(target.querySelector("img")?.getAttribute("src")===src)return;
+        const img=document.createElement("img");
+        img.src=src;
+        img.alt="";
+        target.replaceChildren(img);
+      }
+    });
+  }
+  _scheduleIconPreviews() {
+    clearTimeout(this._iconPreviewTimer);
+    this._iconPreviewTimer=null;
+    if(!this.isConnected || !this._online)return;
+    if(this._iconPreviewEntry!==this._entry) {
+      if(this._iconPreviewEntry!==null)this._iconPreviewCaches.set(this._iconPreviewEntry,this._iconPreviewCache);
+      this._iconPreviewCache=this._iconPreviewCaches.get(this._entry)||(this._iconPreviewEntry===null?this._iconPreviewCache:{});
+      this._iconPreviewEntry=this._entry;
+      this._iconPreviewFailed.clear();
+    }
+    // Playlist thumbnails come first. Only the current 12-tile page is rendered.
+    const ids=new Set([...this.shadowRoot.querySelectorAll("[data-icon-preview]")].map(el=>el.dataset.iconPreview));
+    if(this._iconPickerOpen) {
+      this.shadowRoot.querySelectorAll("[data-picker-preview]").forEach(el=>ids.add(el.dataset.pickerPreview));
+    }
+    for(const id of ids) {
+      if(this._iconPreviewCache[id]) { this._paintIconPreview(id,this._iconPreviewCache[id]); continue; }
+      const entry=this._entry, key=JSON.stringify([entry,id]);
+      if(this._iconPreviewFailed.has(key))continue;
+      if(this._iconPreviewActive || this._iconPreviewAuthBlocked.has(entry))return;
+      const delay=this._iconPreviewNextAt-Date.now();
+      if(delay>0) {
+        this._iconPreviewTimer=setTimeout(()=>this._scheduleIconPreviews(),delay);
+        return;
+      }
+      this._iconPreviewActive=1;
+      this._iconPreviewPending.add(key);
+      Promise.resolve().then(()=>this._loadIconPreview(id,null,entry)).then(src=>{
+        if(this._entry===entry)this._paintIconPreview(id,src);
+      }).catch(err=>{
+        if(err?.code==="icon_unavailable")this._iconPreviewFailed.add(key);
+        else if(err?.code==="invalid_auth")this._iconPreviewAuthBlocked.add(entry);
+        else this._iconPreviewNextAt=Date.now()+2000;
+        if(this._entry===entry)this._paintIconPreview(id,null);
+      }).finally(()=>{
+        this._iconPreviewNextAt=Math.max(this._iconPreviewNextAt,Date.now()+200);
+        this._iconPreviewActive=0;
+        this._iconPreviewPending.delete(key);
+        this._scheduleIconPreviews();
+      });
+      return;
+    }
+  }
+  async _loadIconPreview(iconId, target=null, entry=this._entry) {
+    const cache=entry===this._entry?this._iconPreviewCache:this._iconPreviewCaches.get(entry);
+    if(cache?.[iconId]) { if(target)target.src=cache[iconId]; return cache[iconId]; }
+    const icon=(await this._ws("rpi2dmd/icons/get",{icon_id:iconId,entry_id:entry})).icon;
+    if(icon?.content_type!=="image/png" || typeof icon.data!=="string" || !icon.data) {
+      throw {code:"icon_unavailable"};
+    }
+    const src=`data:image/png;base64,${icon.data}`;
+    const destination=entry===this._entry?this._iconPreviewCache:(this._iconPreviewCaches.get(entry)||{});
+    destination[iconId]=src;
+    this._iconPreviewCaches.set(entry,destination);
+    if(target)target.src=src;
+    return src;
+  }
+  async _setItemIcon(itemId, iconId){if(!itemId)return;try{await this._wsWrite("rpi2dmd/playlist/update",{item_id:itemId,changes:{icon:iconId,show_icon:Boolean(iconId)}});this._clearFeatureError("playlist");this._closeIconPicker();await this._loadSection("playlist");}catch(e){this._showFeatureError("playlist",e,"Impossible d'enregistrer l'icône MQTT.");}}
   async _move(id,delta){const items=this._playlist?.items||[], i=items.findIndex(x=>x.id===id); if(i<0)return; await this._playlistAction("rpi2dmd/playlist/move",{item_id:id,index:i+delta});}
   async _toggleItem(id, enabled){await this._playlistAction("rpi2dmd/playlist/update",{item_id:id,changes:{enabled:Boolean(enabled)}});}
   async _toggleGifCategory(id, enabled){const current=this._gifCategoriesList().filter(x=>x.enabled).map(x=>x.id);const next=enabled?[...new Set([...current,id])]:current.filter(x=>x!==id);try{await this._wsWrite("rpi2dmd/gifs/categories/update",{enabled_ids:next});this._clearFeatureError("gif");await this._loadSection("gif");}catch(e){this._showFeatureError("gif",e,"Impossible de modifier les catégories GIF.");}}

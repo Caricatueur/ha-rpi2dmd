@@ -262,3 +262,197 @@ for(const code of ['cannot_connect','invalid_auth','api_error']) test(`playlist 
   await page.waitForFunction(()=>!p._online);
   assert.match(await page.locator('main').innerText(),/Impossible de joindre le RPI2DMD/);
 });
+
+async function previewFixture(t, {cached=0,count=60}={}) {
+  const page=await playlistFixture(t);
+  await page.clock.install({time:new Date("2026-01-01T00:00:00Z")});
+  await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
+  await page.evaluate(({cached,count})=>{
+    window.previews={active:0,peak:0,started:[],times:[],pending:[],messages:[]};
+    for(let i=0;i<cached;i++)p._iconPreviewCache[`icon-${i}`]='data:image/png;base64,AA==';
+    const load=p._loadIconPreview.bind(p);
+    p._loadIconPreview=async(...args)=>{
+      previews.active++;previews.peak=Math.max(previews.peak,previews.active);
+      try{return await load(...args);}finally{previews.active--;}
+    };
+    p._hass.callWS=msg=>{
+      previews.messages.push(msg);
+      if(msg.type==='rpi2dmd/icons/list')return Promise.resolve({icons:{items:Array.from({length:count},(_,i)=>({id:`icon-${i}`,name:`Icon ${i}`,category:i<30?'A':'B'}))}});
+      if(msg.type==='rpi2dmd/icons/get') {
+        previews.started.push(msg.icon_id);previews.times.push(Date.now());
+        return new Promise((resolve,reject)=>previews.pending.push({resolve,reject}));
+      }
+      if(msg.type==='rpi2dmd/status')return Promise.resolve({online:true,status:{}});
+      if(msg.type==='rpi2dmd/playlist/update') {
+        Object.assign(p._playlist.items.find(i=>i.id===msg.item_id),msg.changes);
+        return Promise.resolve({item:{id:msg.item_id,...msg.changes}});
+      }
+      if(msg.type==='rpi2dmd/playlist/get')return Promise.resolve({playlist:p._playlist});
+      throw new Error('Unexpected command');
+    };
+    window.finishPreview=async(code=null)=>{
+      const request=previews.pending.shift();
+      if(!request)throw new Error('No pending preview');
+      if(code)request.reject({code});else request.resolve({icon:{content_type:'image/png',data:'AA=='}});
+      for(let i=0;i<15;i++)await Promise.resolve();
+    };
+  },{cached,count});
+  await page.evaluate(()=>p._openIconPicker('first'));
+  return page;
+}
+async function drainPage(page) {
+  for(let i=0;i<20;i++) {
+    if(!await page.evaluate(()=>previews.pending.length))break;
+    await page.evaluate(()=>finishPreview());
+    await page.clock.runFor(200);
+  }
+}
+
+test('60 icons load one at a time with 200ms pacing and only 12 initial previews',async t=>{
+  const page=await previewFixture(t);
+  assert.equal(await page.evaluate(()=>previews.started.length),1);
+  await page.evaluate(()=>{for(let i=0;i<10;i++)p._render();});
+  await page.evaluate(()=>finishPreview());
+  assert.equal(await page.locator('[data-picker-preview="icon-0"] img').count(),1);
+  assert.equal(await page.evaluate(()=>previews.started.length),1);
+  await page.clock.runFor(199);
+  assert.equal(await page.evaluate(()=>previews.started.length),1);
+  await page.clock.runFor(1);
+  assert.equal(await page.evaluate(()=>previews.started.length),2);
+  await drainPage(page);
+  await page.clock.runFor(5000);
+  assert.equal(await page.evaluate(()=>previews.started.length),12);
+  assert.equal(await page.locator('[data-action=icon-select]').count(),12);
+  for(let pageNumber=1;pageNumber<5;pageNumber++) {
+    await page.locator('[data-action=icon-next]').click();
+    await drainPage(page);
+  }
+  assert.deepEqual(await page.evaluate(()=>({peak:previews.peak,total:previews.started.length,unique:new Set(previews.started).size,paced:previews.times.every((time,i)=>i===0||time-previews.times[i-1]>=200)})),{peak:1,total:60,unique:60,paced:true});
+});
+
+for(const code of ['temporary_unavailable','cannot_connect']) test(`temporary ${code} backs off 2s then retries without permanent failure`,async t=>{
+  const page=await previewFixture(t);
+  await page.evaluate(code=>finishPreview(code),code);
+  assert.equal(await page.evaluate(()=>p._iconPreviewFailed.size),0);
+  await page.evaluate(()=>{p._render();p._refreshStatus();});
+  await page.clock.runFor(1999);
+  assert.equal(await page.evaluate(()=>previews.started.length),1);
+  assert.equal(await page.locator('.online-pill').innerText(),'En ligne');
+  await page.clock.runFor(1);
+  assert.deepEqual(await page.evaluate(()=>previews.started),['icon-0','icon-0']);
+  await page.evaluate(()=>finishPreview());
+  await page.clock.runFor(200);
+  assert.deepEqual(await page.evaluate(()=>previews.started),['icon-0','icon-0','icon-1']);
+  assert.equal(await page.locator('[data-picker-preview="icon-0"] img').count(),1);
+  assert.equal(await page.locator('[role=alert]').count(),0);
+});
+
+test('permanent failure is skipped but next download still waits 200ms',async t=>{
+  const page=await previewFixture(t);
+  await page.evaluate(()=>finishPreview('icon_unavailable'));
+  assert.equal(await page.evaluate(()=>p._iconPreviewFailed.size),1);
+  await page.clock.runFor(199);
+  assert.equal(await page.evaluate(()=>previews.started.length),1);
+  await page.clock.runFor(1);
+  assert.deepEqual(await page.evaluate(()=>previews.started),['icon-0','icon-1']);
+  await drainPage(page);
+  await page.evaluate(()=>p._render());
+  assert.equal(await page.evaluate(()=>previews.started.length),12);
+});
+
+test('cache survives renders, reopening and switching back to the same device',async t=>{
+  const page=await previewFixture(t,{cached:10});
+  await drainPage(page);
+  assert.deepEqual(await page.evaluate(()=>previews.started),['icon-10','icon-11']);
+  await page.evaluate(()=>{p._closeIconPicker();p._entry='b';p._render();});
+  await page.evaluate(()=>{p._entry='a';p._render();return p._openIconPicker('first');});
+  await page.clock.runFor(5000);
+  assert.equal(await page.evaluate(()=>previews.started.length),2);
+  assert.equal(await page.locator('.icon-tile img').count(),12);
+});
+
+test('closing picker cancels paced work and backoff retries',async t=>{
+  const page=await previewFixture(t);
+  await page.evaluate(()=>finishPreview('temporary_unavailable'));
+  await page.locator('[data-action=icon-close]').click();
+  await page.clock.runFor(5000);
+  assert.equal(await page.evaluate(()=>previews.started.length),1);
+});
+
+test('filter changes discard old pending previews and reset pagination',async t=>{
+  const page=await previewFixture(t);
+  await page.locator('#icon-category').selectOption('B');
+  await page.evaluate(()=>finishPreview());
+  await page.clock.runFor(200);
+  assert.deepEqual(await page.evaluate(()=>previews.started),['icon-0','icon-30']);
+  await drainPage(page);
+  await page.locator('[data-action=icon-next]').click();
+  await page.evaluate(()=>finishPreview());
+  await page.locator('#icon-search').fill('Icon 59');
+  await page.clock.runFor(200);
+  assert.equal(await page.evaluate(()=>previews.started.at(-1)),'icon-59');
+  assert.equal(await page.evaluate(()=>p._iconPage),0);
+  assert.equal(await page.locator('[data-action=icon-select]').count(),1);
+});
+
+test('MQTT row preview has priority, paints without render and selection still updates playlist',async t=>{
+  const page=await previewFixture(t);
+  await page.evaluate(()=>{
+    p._playlist.items[0].icon='assigned';p._render();
+    window.renders=0;const render=p._render.bind(p);p._render=(...args)=>{renders++;return render(...args);};
+  });
+  await page.evaluate(()=>finishPreview());
+  await page.clock.runFor(200);
+  assert.deepEqual(await page.evaluate(()=>previews.started),['icon-0','assigned']);
+  await page.evaluate(()=>finishPreview());
+  assert.equal(await page.locator('[data-icon-preview=assigned]').getAttribute('src'),'data:image/png;base64,AA==');
+  assert.equal(await page.evaluate(()=>renders),0);
+  await page.evaluate(()=>p._refreshStatus());
+  await page.locator('[data-action=icon-select][data-icon-id="icon-0"]').click();
+  assert.deepEqual(await page.evaluate(()=>previews.messages.find(m=>m.type==='rpi2dmd/playlist/update').changes),{icon:'icon-0',show_icon:true});
+  assert.equal(await page.locator('[data-icon-preview="icon-0"]').getAttribute('src'),'data:image/png;base64,AA==');
+  assert.equal(await page.locator('[role=alert]').count(),0);
+  assert.equal(await page.evaluate(()=>previews.peak),1);
+});
+
+test('device switch discards queued old previews and stale catalogs',async t=>{
+  const page=await previewFixture(t);
+  await page.evaluate(()=>{p._entry='b';p._clearRuntimeData();p._render();});
+  await page.evaluate(()=>finishPreview());
+  await page.clock.runFor(5000);
+  assert.equal(await page.evaluate(()=>previews.started.length),1);
+  assert.equal(await page.locator('[role=dialog]').count(),0);
+});
+
+test('late icon catalog cannot reopen a closed picker',async t=>{
+  const page=await playlistFixture(t);
+  await page.locator('[data-action=icon-picker][data-item=first]').click();
+  await page.locator('[data-action=icon-close]').click();
+  await page.evaluate(()=>calls[0].resolve({icons:{items:[{id:'stale'}]}}));
+  assert.equal(await page.locator('[role=dialog]').count(),0);
+  assert.equal(await page.evaluate(()=>calls.length),1);
+});
+
+test('authentication failure does not trigger repeated automatic preview requests',async t=>{
+  const page=await previewFixture(t);
+  await page.evaluate(()=>finishPreview('invalid_auth'));
+  await page.clock.runFor(10000);
+  assert.equal(await page.evaluate(()=>previews.started.length),1);
+  assert.equal(await page.evaluate(()=>p._iconPreviewFailed.size),0);
+});
+
+test('frontend version is visible on every page and logged only once per module load',async t=>{
+  const page=await browser.newPage();t.after(()=>page.close());
+  const messages=[];
+  page.on('console',message=>{if(message.type()==='info')messages.push(message.text());});
+  await page.addScriptTag({path:path.resolve('custom_components/rpi2dmd/frontend/rpi2dmd-panel.js')});
+  await page.evaluate(()=>{
+    window.p=document.createElement('rpi2dmd-panel');document.body.append(p);
+    p._bannerChecked=true;p._render();
+  });
+  for(const section of ['dashboard','playlist','system']) {
+    await page.evaluate(section=>{p._section=section;p._render();},section);
+    assert.equal(await page.locator('footer').innerText(),'Interface HA : 0.4.5');
+  }
+  assert.deepEqual(messages,['[RPI2DMD] frontend 0.4.5 loaded']);
+});

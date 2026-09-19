@@ -16,6 +16,9 @@ from .brightness import _validate_hourly
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
 
+_LOGGER = logging.getLogger(__name__)
+
+
 class RPI2DMDCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Share /status and refresh the authoritative brightness schedule."""
 
@@ -36,19 +39,23 @@ class RPI2DMDCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
-            # Preserve the historical status-read policy: one retry after 0.5s.
-            status = await async_retry_busy(
-                self.api.async_get_status, attempts=2, delay=0.5,
-                is_busy=lambda err: str(err) == "Configuration is busy"
-                and err.status not in (401, 403),
-            )
+            try:
+                # Preserve the historical status-read policy: one retry after 0.5s.
+                status = await async_retry_busy(
+                    self.api.async_get_status, attempts=2, delay=0.5,
+                    is_busy=lambda err: str(err) == "Configuration is busy"
+                    and err.status not in (401, 403),
+                )
+            except Exception as err:
+                _LOGGER.debug("Coordinator diagnostic endpoint=status failed exception=%s", type(err).__name__)
+                raise
             try:
                 await self.async_refresh_brightness_schedule(notify=False)
             except RPI2DMDAuthError:
                 raise
             except (RPI2DMDError, ValueError):
                 # A brightness-only failure must not disable unrelated entities.
-                logging.getLogger(DOMAIN).debug("Brightness schedule refresh failed", exc_info=True)
+                pass  # The endpoint-specific diagnostic is emitted below.
             return status
         except RPI2DMDAuthError:
             # Real ConfigEntry instances use HA's auth-failure path. Lightweight
@@ -62,7 +69,11 @@ class RPI2DMDCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_refresh_brightness_schedule(self, *, notify: bool = True) -> list[dict[str, Any]]:
         """Read confirmed API values and notify the number after panel requests."""
         try:
-            hourly = _validate_hourly(await self.api.async_get_brightness_schedule())
+            try:
+                hourly = _validate_hourly(await self.api.async_get_brightness_schedule())
+            except Exception as err:
+                _LOGGER.debug("Coordinator diagnostic endpoint=brightness_schedule failed exception=%s", type(err).__name__)
+                raise
             points = [
                 {"time": f"{row['hour']:02d}:00", "value": row["value"]}
                 for row in hourly

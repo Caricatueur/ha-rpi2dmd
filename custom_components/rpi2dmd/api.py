@@ -20,6 +20,54 @@ from .const import API_PREFIX, DEFAULT_TIMEOUT
 _LOGGER = logging.getLogger(__name__)
 
 
+_UNREAD = object()
+# Remote strings (including key names and error messages) may contain secrets.
+_DIAGNOSTIC_KEYS = frozenset({"ok", "data", "error", "request_id", "code", "message"})
+_DIAGNOSTIC_ERRORS = frozenset({
+    "API error", "Configuration is busy", "Conflict", "Internal server error",
+    "busy", "conflict", "config_busy", "invalid_auth", "unauthorized", "forbidden",
+})
+
+
+def _diagnostic_path(path: str) -> str:
+    """Keep endpoint identity without logging query strings or dynamic IDs."""
+    parts = path.split("?", 1)[0].split("/")
+    allowed = {"api", "v1", "status", "info", "display", "brightness-schedule",
+               "playlist", "items", "move", "duplicate", "icons", "mqtt", "test",
+               "gifs", "categories", "weather", "system", "config", "export",
+               "import", "validate", "apply"}
+    return "/".join(part if part in allowed or not part else "<redacted>" for part in parts)
+
+
+def _diagnostic_response(method: str, path: str, status: int | None,
+                         payload: Any = _UNREAD, *, reason: str,
+                         body_size: int | None = None) -> None:
+    """Log structure only; never serialize remote data or arbitrary text."""
+    if status is None or not _LOGGER.isEnabledFor(logging.DEBUG):
+        return
+    if reason == "invalid_json":
+        _LOGGER.debug("API diagnostic method=%s path=%s status=%s invalid_json body_size=%s",
+                      method, _diagnostic_path(path), status, body_size)
+        return
+    fields = payload if isinstance(payload, dict) else {}
+    error = fields.get("error")
+    error = error if isinstance(error, dict) else fields
+    def safe_error(value: Any) -> str:
+        return value if isinstance(value, str) and value in _DIAGNOSTIC_ERRORS else "<redacted>"
+    ok = fields.get("ok")
+    _LOGGER.debug(
+        "API diagnostic method=%s path=%s status=%s reason=%s payload_type=%s "
+        "keys=%s ok=%s data_present=%s data_type=%s error_code=%s error_message=%s",
+        method, _diagnostic_path(path), status, reason,
+        "unread" if payload is _UNREAD else type(payload).__name__,
+        sorted(key if key in _DIAGNOSTIC_KEYS else "<redacted>" for key in fields),
+        ok if isinstance(ok, bool) or ok is None else "<redacted>",
+        "data" in fields, type(fields.get("data")).__name__,
+        safe_error(error["code"]) if "code" in error else "absent",
+        safe_error(error["message"]) if "message" in error else "absent",
+    )
+
+
 class RPI2DMDError(Exception):
     """Base API error."""
 
@@ -133,6 +181,10 @@ class RPI2DMDClient:
             headers["Content-Type"] = "application/json; charset=utf-8"
         gif_debug = path.startswith("/gifs")
         started = time.monotonic()
+        http_status = None
+        payload = _UNREAD
+        diagnostic_reason = "request_failed"
+        body_size = None
         try:
             async with asyncio.timeout(self.timeout):
                 async with self._session.request(
@@ -142,6 +194,7 @@ class RPI2DMDClient:
                     params=params,
                     json=body,
                 ) as response:
+                    http_status = response.status
                     if response.status in (401, 403):
                         if gif_debug:
                             _LOGGER.debug("GIF DEBUG request=%s endpoint=%s status=%s duration=%.2fs failure=auth", method, path, response.status, time.monotonic() - started)
@@ -154,6 +207,10 @@ class RPI2DMDClient:
                             error = payload.get("error") if isinstance(payload, dict) else None
                             message = error.get("message", "API error") if isinstance(error, dict) else "API error"
                         except (ValueError, TypeError):
+                            diagnostic_reason = "invalid_json"
+                            # aiohttp caches bytes read by json(); no extra body read.
+                            cached_body = getattr(response, "_body", None)
+                            body_size = len(cached_body) if isinstance(cached_body, bytes) else None
                             message = "API error"
                         message = message if isinstance(message, str) else "API error"
                         if self.token:
@@ -163,13 +220,16 @@ class RPI2DMDClient:
                     # empty 200/201 body). Do not require JSON when the HTTP
                     # contract intentionally has no response document.
                     raw = await response.read()
+                    body_size = len(raw)
                     if not raw.strip():
+                        _diagnostic_response(method, path, http_status, reason="empty_body")
                         if gif_debug:
                             _LOGGER.debug("GIF DEBUG request=%s endpoint=%s status=%s duration=%.2fs response=empty", method, path, response.status, time.monotonic() - started)
                         return {}
                     try:
                         payload = json.loads(raw.decode(response.charset or "utf-8"))
                     except (UnicodeDecodeError, ValueError, TypeError) as err:
+                        diagnostic_reason = "invalid_json"
                         if gif_debug:
                             _LOGGER.debug("GIF DEBUG request=%s endpoint=%s status=%s duration=%.2fs failure=invalid_json error=%s", method, path, response.status, time.monotonic() - started, type(err).__name__)
                         raise RPI2DMDError("Invalid JSON response") from err
@@ -178,6 +238,8 @@ class RPI2DMDClient:
                             _LOGGER.debug("GIF DEBUG request=%s endpoint=%s status=%s duration=%.2fs failure=malformed_json", method, path, response.status, time.monotonic() - started)
                         raise RPI2DMDError("Malformed API response")
                     data = payload.get("data")
+                    if not isinstance(data, dict):
+                        _diagnostic_response(method, path, http_status, payload, reason="non_dict_data")
                     result = data if isinstance(data, dict) else {}
                     if gif_debug:
                         count = result.get("total", result.get("count"))
@@ -187,13 +249,19 @@ class RPI2DMDClient:
                         _LOGGER.debug("GIF DEBUG request=%s endpoint=%s status=%s duration=%.2fs response=dict count=%s", method, path, response.status, time.monotonic() - started, count)
                     return result
         except RPI2DMDError:
+            _diagnostic_response(method, path, http_status, payload, reason=diagnostic_reason, body_size=body_size)
             raise
         except asyncio.TimeoutError:
+            _diagnostic_response(method, path, http_status, payload, reason="timeout")
             raise RPI2DMDTimeoutError("RPI2DMD request timed out") from None
         except (ClientError, OSError) as err:
+            _diagnostic_response(method, path, http_status, payload, reason="connection_error")
             if gif_debug:
                 _LOGGER.debug("GIF DEBUG request=%s endpoint=%s duration=%.2fs failure=%s", method, path, time.monotonic() - started, type(err).__name__)
             raise RPI2DMDConnectionError("Unable to connect to RPI2DMD") from err
+        except Exception:
+            _diagnostic_response(method, path, http_status, payload, reason="unexpected_error")
+            raise
 
     async def async_get_info(self) -> dict[str, Any]:
         return await self._request("GET", "/info", authenticated=False)

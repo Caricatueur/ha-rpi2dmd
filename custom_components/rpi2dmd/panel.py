@@ -8,6 +8,8 @@ from homeassistant.components import frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
 
+from .const import VERSION
+
 PANEL_PATH = "/rpi2dmd-panel.js"
 LOGO_PATH = "/rpi2dmd-assets/rpi2dmd-ha-logo.png"
 BANNER_PATH = "/rpi2dmd-assets/rpi2dmd-ha-banner.png"
@@ -37,7 +39,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         frontend_url_path=PANEL_URL,
         sidebar_title="RPI2DMD",
         sidebar_icon="mdi:led-strip-variant",
-        module_url=PANEL_PATH,
+        module_url=f"{PANEL_PATH}?v={VERSION}",
         require_admin=False,
         config={},
         config_panel_domain="rpi2dmd",

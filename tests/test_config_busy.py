@@ -276,3 +276,166 @@ async def test_direct_status_get_has_no_new_conflict_retry(setup):
     assert error.value.status == 409
     sleep.assert_not_called()
     assert session.request.call_count == 1
+
+
+class DiagnosticResponse(Response):
+    def __init__(self, status, payload=None, raw=None):
+        self.status = status
+        self._body = raw if raw is not None else json.dumps(payload).encode()
+
+    async def read(self):
+        return self._body
+
+    async def json(self, **kwargs):
+        return json.loads(self._body)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('status,payload,expected,message', [
+    (200, {'ok': False, 'data': {}}, ['payload_type=dict', 'ok=False', 'data_type=dict'], 'Malformed API response'),
+    (200, [], ['payload_type=list', 'data_present=False'], 'Malformed API response'),
+    (200, {'ok': True, 'data': []}, ['ok=True', 'data_type=list', 'reason=non_dict_data'], None),
+    (200, {'ok': True}, ['ok=True', 'data_present=False', 'data_type=NoneType'], None),
+    (400, {'error': {'code': 'conflict', 'message': 'Configuration is busy'}}, ['error_code=conflict', 'error_message=Configuration is busy'], 'Configuration is busy'),
+    (400, {'error': {'message': None}}, ['error_message=<redacted>'], 'API error'),
+    (400, {'ok': False}, ['ok=False', 'error_message=absent'], 'API error'),
+    (400, {'code': 'busy', 'message': 'Conflict'}, ['error_code=busy', 'error_message=Conflict'], 'API error'),
+])
+async def test_api_diagnostic_structure_preserves_response_behavior(setup, caplog, status, payload, expected, message):
+    from custom_components.rpi2dmd.api import RPI2DMDError
+    _, session, api = setup
+    session.request.return_value = DiagnosticResponse(status, payload)
+    with caplog.at_level(logging.DEBUG, logger='custom_components.rpi2dmd.api'):
+        if message is None:
+            assert await api.async_get_status() == {}  # Preserve existing non-dict data handling.
+        else:
+            with pytest.raises(RPI2DMDError) as error:
+                await api.async_get_status()
+            assert str(error.value) == message
+    assert 'method=GET path=/status status=' + str(status) in caplog.text
+    for value in expected:
+        assert value in caplog.text
+    assert session.request.call_count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('status', [200, 400])
+@pytest.mark.parametrize('raw', [b'{"password":"DO_NOT_LOG_MQTT"', b'\xffWEATHER_KEY_DO_NOT_LOG'])
+async def test_invalid_json_diagnostic_contains_size_never_body(setup, caplog, status, raw):
+    from custom_components.rpi2dmd.api import RPI2DMDError
+    _, session, api = setup
+    session.request.return_value = DiagnosticResponse(status, raw=raw)
+    with caplog.at_level(logging.DEBUG, logger='custom_components.rpi2dmd.api'):
+        with pytest.raises(RPI2DMDError) as error:
+            await api.async_get_status()
+    assert str(error.value) == ('API error' if status >= 400 else 'Invalid JSON response')
+    assert f'method=GET path=/status status={status} invalid_json body_size={len(raw)}' in caplog.text
+    assert 'DO_NOT_LOG' not in caplog.text
+    assert all(record.exc_info is None for record in caplog.records)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('status', [200, 400, 401, 403])
+async def test_diagnostics_never_log_secrets_in_values_keys_errors_or_paths(setup, caplog, status):
+    from custom_components.rpi2dmd.api import RPI2DMDError
+    _, session, api = setup
+    secrets = ['PRIVATE_API_TOKEN', 'PRIVATE_MQTT_PASSWORD', 'PRIVATE_WEATHER_KEY', 'PRIVATE_REQUEST_ID']
+    api.token = secrets[0]
+    payload = {
+        'ok': secrets[0], 'request_id': secrets[3],
+        secrets[1]: secrets[2],
+        'data': {'token': secrets[0], 'password': secrets[1], 'api_key': secrets[2]},
+        'error': {'code': secrets[1], 'message': 'Authorization: Bearer ' + ' '.join(secrets)},
+    }
+    session.request.return_value = DiagnosticResponse(status, payload)
+    with caplog.at_level(logging.DEBUG, logger='custom_components.rpi2dmd.api'):
+        with pytest.raises(RPI2DMDError):
+            await api._request('PUT', '/playlist/items/' + secrets[0] + '?key=' + secrets[2], body=payload['data'])
+    assert 'API diagnostic' in caplog.text
+    assert all(secret not in caplog.text for secret in secrets)
+    assert 'Authorization' not in caplog.text and 'Bearer' not in caplog.text
+    assert all(record.exc_info is None for record in caplog.records)
+    assert session.request.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_successful_payload_is_not_dumped(setup, caplog):
+    _, session, api = setup
+    payload = {'ok': True, 'data': {'password': 'PRIVATE_PASSWORD'}}
+    session.request.return_value = DiagnosticResponse(200, payload)
+    with caplog.at_level(logging.DEBUG, logger='custom_components.rpi2dmd.api'):
+        assert await api.async_get_status() == payload['data']
+    assert 'PRIVATE_PASSWORD' not in caplog.text
+    assert 'API diagnostic' not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('endpoint', ['status', 'brightness_schedule'])
+async def test_coordinator_diagnostic_identifies_stage_without_exception_text(setup, caplog, endpoint):
+    from custom_components.rpi2dmd.api import RPI2DMDHTTPError
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+    coordinator, _, api = setup
+    api.async_get_status = AsyncMock(return_value={'online': True})
+    api.async_get_brightness_schedule = AsyncMock(return_value={'schedule': [{'hour': h, 'value': 50} for h in range(24)]})
+    getattr(api, 'async_get_' + endpoint).side_effect = RPI2DMDHTTPError(400, 'PRIVATE_EXCEPTION_PASSWORD')
+    with caplog.at_level(logging.DEBUG, logger='custom_components.rpi2dmd.coordinator'):
+        if endpoint == 'status':
+            with pytest.raises(UpdateFailed):
+                await coordinator._async_update_data()
+            api.async_get_brightness_schedule.assert_not_awaited()
+        else:
+            assert await coordinator._async_update_data() == {'online': True}
+            assert 'endpoint=status failed' not in caplog.text
+    assert f'endpoint={endpoint} failed exception=RPI2DMDHTTPError' in caplog.text
+    assert 'PRIVATE_EXCEPTION_PASSWORD' not in caplog.text
+    assert all(record.exc_info is None for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_brightness_validation_stage_is_diagnosed_without_changing_availability(setup, caplog):
+    coordinator, session, api = setup
+    session.request.return_value = Response()
+    api.async_get_brightness_schedule.return_value = {}
+    with caplog.at_level(logging.DEBUG, logger='custom_components.rpi2dmd.coordinator'):
+        await coordinator.async_refresh()
+    assert coordinator.last_update_success
+    assert 'endpoint=status failed' not in caplog.text
+    assert 'endpoint=brightness_schedule failed exception=ValueError' in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('kind,code', [
+    (502, 'temporary_unavailable'), (503, 'temporary_unavailable'),
+    (500, 'temporary_unavailable'), (404, 'icon_unavailable'), (410, 'icon_unavailable'),
+    ('connection', 'temporary_unavailable'), ('timeout', 'temporary_unavailable'),
+    ('format', 'icon_unavailable'), ('empty', 'icon_unavailable'),
+    (401, 'invalid_auth'), (403, 'invalid_auth'),
+])
+async def test_icon_errors_are_classified_without_remote_text_or_retries(setup, kind, code):
+    from custom_components.rpi2dmd import websocket
+    from custom_components.rpi2dmd.api import (
+        RPI2DMDAuthError, RPI2DMDConnectionError, RPI2DMDTimeoutError,
+        RPI2DMDHTTPError, RPI2DMDError,
+    )
+    coordinator, _, api = setup
+    errors = {
+        'connection': RPI2DMDConnectionError('PRIVATE_REMOTE_SECRET'),
+        'timeout': RPI2DMDTimeoutError('PRIVATE_REMOTE_SECRET'),
+        'format': RPI2DMDError('Icon asset is not a PNG'),
+        'empty': RPI2DMDError('Icon asset is empty'),
+    }
+    error = (RPI2DMDAuthError('API authentication rejected') if kind in (401, 403)
+             else RPI2DMDHTTPError(kind, 'PRIVATE_REMOTE_SECRET') if isinstance(kind, int)
+             else errors[kind])
+    api.async_get_icon = AsyncMock(side_effect=error)
+    coordinator.async_set_updated_data({'online': True})
+    coordinator.hass.data['rpi2dmd'] = {'entry': {'api': api, 'coordinator': coordinator}}
+    connection = SimpleNamespace(send_result=Mock(), send_error=Mock())
+    await websocket._websocket_handler(coordinator.hass, connection, {
+        'id': 1, 'type': 'rpi2dmd/icons/get', 'entry_id': 'entry', 'icon_id': 'test',
+    })
+    api.async_get_icon.assert_awaited_once_with('test')
+    assert connection.send_error.call_args.args[1] == code
+    assert 'PRIVATE_REMOTE_SECRET' not in str(connection.send_error.call_args)
+    connection.send_result.assert_not_called()
+    assert coordinator.last_update_success

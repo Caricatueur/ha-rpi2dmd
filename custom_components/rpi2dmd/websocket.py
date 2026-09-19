@@ -219,7 +219,20 @@ async def _websocket_handler(hass: HomeAssistant, connection, msg: dict[str, Any
     try:
         result = await _call(hass, msg)
     except (RPI2DMDError, ValueError, KeyError, TypeError) as err:
-        _send_error(connection, msg["id"], err)
+        if msg["type"] == "rpi2dmd/icons/get" and not isinstance(err, RPI2DMDAuthError):
+            # Only asset reads receive this classification; never forward remote text.
+            permanent = (
+                isinstance(err, RPI2DMDHTTPError) and err.status in (404, 410)
+            ) or (
+                type(err) is RPI2DMDError
+                and str(err) in ("Icon asset is not a PNG", "Icon asset is empty")
+            ) or isinstance(err, (ValueError, KeyError, TypeError))
+            connection.send_error(
+                msg["id"], "icon_unavailable" if permanent else "temporary_unavailable",
+                "Icon unavailable" if permanent else "Icon temporarily unavailable",
+            )
+        else:
+            _send_error(connection, msg["id"], err)
         return
     except Exception as err:  # pragma: no cover - defensive HA boundary
         _LOGGER.exception("RPI2DMD WebSocket command %s failed", msg.get("type"))
