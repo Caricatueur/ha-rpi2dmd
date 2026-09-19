@@ -172,21 +172,120 @@ sans utiliser SSH ou PuTTY.
 
 ## État du projet
 
-Version actuelle : **0.4.5**.
+## État du projet
 
-La version 0.4.0 ajoute la découverte Zeroconf (`_rpi2dmd._tcp.local.`), le
-pairing physique par code à six chiffres et la réauthentification. L’identité
-matérielle stable `instance_id` est conservée lors des changements d’adresse,
-avec la préférence `RPI2DMD.local`, puis IPv4, puis IPv6. Les entrées existantes
-peuvent récupérer leurs `entity_id` canoniques sans modifier leurs `unique_id`.
-Les migrations de planning de luminosité utilisent le stockage Home Assistant
-et restent idempotentes.
+**Version actuelle : 0.4.5**
 
-Cible de qualification : **Home Assistant Core 2026.9.2**, Python 3.14.2
-ou supérieur. Voir `tests/requirements-ha8.txt` et le rapport HA8 pour les
-résultats effectifs ; l’ancien environnement 2024.12.5 reste historique.
+L’intégration RPI2DMD pour Home Assistant est désormais fonctionnelle pour les principales fonctions de configuration, de supervision et de pilotage du panneau RPI2DMD.
 
-Les fonctions principales et l'intégration native sont opérationnelles.
+### Découverte et identification du RPI2DMD
+
+Depuis la version 0.4.0, l’intégration prend en charge :
+
+- la découverte automatique du RPI2DMD via Zeroconf (`_rpi2dmd._tcp.local.`) ;
+- le pairing physique sécurisé par code à six chiffres ;
+- la réauthentification depuis Home Assistant ;
+- une identité matérielle stable basée sur `instance_id` ;
+- la conservation de cette identité lors d’un changement d’adresse IP ;
+- la préférence automatique pour `RPI2DMD.local`, puis IPv4 et IPv6 ;
+- la récupération des entités déjà existantes afin d’éviter les doublons et de conserver leurs `unique_id`.
+
+Les migrations de configuration et du planning de luminosité sont conçues pour rester idempotentes afin qu’une mise à jour de l’intégration ne recrée pas inutilement les entités.
+
+### Interface Home Assistant
+
+Le RPI2DMD dispose d’un panneau Home Assistant dédié permettant notamment de gérer :
+
+- l’état général du panneau ;
+- l’affichage ;
+- la luminosité et sa programmation horaire ;
+- la playlist ;
+- les messages MQTT ;
+- les GIF et leurs catégories ;
+- la météo ;
+- les informations système ;
+- l’export et l’import de configuration.
+
+Les échanges avec le Raspberry Pi passent par le backend Home Assistant : les informations sensibles telles que le mot de passe MQTT ou la clé API du RPI2DMD ne sont pas envoyées directement au navigateur.
+
+### Playlist et stabilité des modifications
+
+Les versions 0.4.2 à 0.4.5 améliorent fortement la gestion des modifications de playlist.
+
+L’intégration sait maintenant gérer les conflits temporaires renvoyés par le RPI2DMD lorsque sa configuration est momentanément occupée (`409 Configuration is busy`).
+
+Dans ce cas :
+
+- les conflits temporaires sont retentés de manière contrôlée ;
+- le nombre de tentatives reste limité ;
+- aucun retry agressif n’est effectué sur les erreurs réseau ambiguës ;
+- l’objectif est d’éviter les doubles modifications ou les écritures involontaires.
+
+Cette logique améliore notamment la stabilité lors de l’ajout, de la modification, du déplacement ou de la suppression d’éléments dans la playlist.
+
+### Sélecteur d’icônes MQTT
+
+Le sélecteur d’icônes a été optimisé afin d’éviter de saturer le Raspberry Pi lors de l’ouverture de la bibliothèque.
+
+Depuis la version 0.4.5 :
+
+- une seule preview d’icône est chargée simultanément ;
+- un délai est appliqué entre les chargements ;
+- un backoff temporaire est utilisé lors d’erreurs `502`, `503`, timeout ou problème de connexion ;
+- seules les premières icônes utiles sont chargées initialement ;
+- les previews des icônes MQTT déjà utilisées sont prioritaires ;
+- les requêtes devenues inutiles sont annulées lors d’un changement de filtre, d’appareil ou de la fermeture du sélecteur ;
+- les previews déjà récupérées sont conservées en cache.
+
+Ces optimisations réduisent fortement les rafales de requêtes vers l’API du RPI2DMD.
+
+### Gestion du cache frontend
+
+Depuis la version 0.4.5, le module JavaScript du panneau Home Assistant utilise une URL versionnée :
+
+`/rpi2dmd-panel.js?v=0.4.5`
+
+Cela permet d’éviter qu’un navigateur continue à utiliser une ancienne version de l’interface après une mise à jour de l’intégration.
+
+La version du frontend réellement chargée est également visible directement dans l’interface :
+
+`Interface HA : 0.4.5`
+
+Un message de diagnostic est aussi affiché dans la console du navigateur :
+
+`[RPI2DMD] frontend 0.4.5 loaded`
+
+Cela facilite fortement le diagnostic des problèmes de cache entre plusieurs navigateurs ou sessions Home Assistant.
+
+### Diagnostic API
+
+Les dernières versions ajoutent également des informations de diagnostic supplémentaires concernant les échanges entre Home Assistant et le RPI2DMD.
+
+Les journaux permettent notamment d’identifier plus facilement :
+
+- la méthode HTTP utilisée ;
+- le chemin API concerné ;
+- le code HTTP retourné ;
+- les réponses JSON invalides ;
+- les erreurs temporaires `409`, `502` et `503`.
+
+Les données sensibles sont masquées et aucun secret n’est ajouté aux journaux de diagnostic.
+
+### Compatibilité et qualification
+
+Cible de qualification actuelle :
+
+- **Home Assistant Core 2026.9.2**
+- **Python 3.14.2 ou supérieur**
+- **RPI2DMD V2.8**
+- **Raspberry Pi 4 : testé physiquement**
+- **Raspberry Pi Zero 2 W : cible de fonctionnement RPI2DMD**
+
+Voir `tests/requirements-ha8.txt` et le rapport HA8 pour les résultats de qualification.
+
+L’action GitHub historique de référence reste basée sur Home Assistant **2024.12.5**.
+
+Les fonctions principales de l’intégration et du panneau Home Assistant sont opérationnelles. Les améliorations actuelles portent principalement sur la robustesse des échanges avec le RPI2DMD, la gestion des accès concurrents et l’optimisation de l’interface.
 
 ## Aperçu de l’interface
 
