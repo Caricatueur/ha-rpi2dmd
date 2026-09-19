@@ -197,3 +197,68 @@ test('playlist form fits mobile viewport',async t=>{
     assert.ok(box.x>=bounds.x && box.x+box.width<=bounds.x+bounds.width+1);
   }
 });
+
+test('persistent playlist busy remains a local error and icon retry clears it after readback',async t=>{
+  const page=await playlistFixture(t);
+  await page.evaluate(()=>{p._setItemIcon('first','temperature');});
+  await page.waitForFunction(()=>calls.length===1);
+  // Backend returns config_busy only after its three confirmed HTTP 409 responses.
+  await page.evaluate(()=>calls[0].reject({code:'config_busy',message:'Conflict'}));
+  await page.waitForFunction(()=>!!p._featureErrors.playlist);
+  assert.equal(await page.locator('[role=alert]').innerText(),'Le RPI2DMD est temporairement occupé. Réessayez dans quelques secondes.');
+  assert.equal(await page.locator('.online-pill').innerText(),'En ligne');
+  assert.equal(await page.evaluate(()=>!!p._error),false);
+  assert.equal(await page.locator('.item').count(),2);
+  await page.evaluate(()=>{p._refreshStatus();});
+  await page.waitForFunction(()=>calls.length===2);
+  await page.evaluate(()=>calls[1].resolve({online:true,status:{playlist:{mode:'playlist'}}}));
+  await page.evaluate(()=>{p._setItemIcon('first','temperature');});
+  await page.waitForFunction(()=>calls.length===3);
+  // A successful server-side 409 → 200 retry produces one successful WS response.
+  await page.evaluate(()=>calls[2].resolve({item:{id:'first',icon:'temperature',show_icon:true}}));
+  await page.waitForFunction(()=>calls.length===4);
+  assert.equal(await page.evaluate(()=>calls[3].msg.type),'rpi2dmd/playlist/get');
+  await page.evaluate(()=>{
+    p._iconPreviewCache.temperature='data:image/png;base64,';
+    calls[3].resolve({playlist:{items:[{id:'first',type:'mqtt',enabled:true,icon:'temperature',show_icon:true}]}});
+  });
+  await page.waitForFunction(()=>!p._playlistLoading());
+  assert.equal(await page.locator('[role=alert]').count(),0);
+  assert.equal(await page.locator('.online-pill').innerText(),'En ligne');
+  assert.equal(await page.locator('[data-icon-preview=temperature]').count(),1);
+  assert.equal(await page.evaluate(()=>p._playlist.items[0].show_icon),true);
+  assert.equal(await page.evaluate(()=>calls.filter(c=>c.msg.type==='rpi2dmd/playlist/add').length),0);
+});
+
+test('successful pending icon write keeps online during status polling and clears old local error',async t=>{
+  const page=await playlistFixture(t);
+  await page.evaluate(()=>{p._featureErrors.playlist='ancienne erreur';p._setItemIcon('first',null);});
+  await page.waitForFunction(()=>calls.length===1);
+  await page.evaluate(()=>{p._refreshStatus();});
+  await page.waitForFunction(()=>calls.length===2);
+  await page.evaluate(()=>calls[1].resolve({online:true,status:{}}));
+  assert.equal(await page.locator('.online-pill').innerText(),'En ligne');
+  await page.evaluate(()=>calls[0].resolve({item:{id:'first',icon:null,show_icon:false}}));
+  await page.waitForFunction(()=>calls.length===3);
+  await page.evaluate(()=>calls[2].resolve({playlist:{items:[{id:'first',type:'mqtt',enabled:true,icon:null,show_icon:false}]}}));
+  await page.waitForFunction(()=>!p._playlistLoading());
+  assert.equal(await page.locator('[role=alert]').count(),0);
+  assert.equal(await page.locator('.online-pill').innerText(),'En ligne');
+  assert.equal(await page.locator('[data-icon-preview]').count(),0);
+  assert.equal(await page.evaluate(()=>calls.filter(c=>c.msg.type==='rpi2dmd/playlist/update').length),1);
+});
+
+for(const code of ['cannot_connect','invalid_auth','api_error']) test(`playlist ${code} keeps historical local error; failed status still goes offline`,async t=>{
+  const page=await playlistFixture(t);
+  await page.evaluate(()=>{p._setItemIcon('first','temperature');});
+  await page.waitForFunction(()=>calls.length===1);
+  await page.evaluate(code=>calls[0].reject({code,message:'failure'}),code);
+  await page.waitForFunction(()=>!!p._featureErrors.playlist);
+  assert.equal(await page.locator('[role=alert]').innerText(),"Impossible d'enregistrer l'icône MQTT.");
+  assert.equal(await page.locator('.online-pill').innerText(),'En ligne');
+  await page.evaluate(()=>{p._refreshStatus();});
+  await page.waitForFunction(()=>calls.length===2);
+  await page.evaluate(()=>calls[1].resolve({online:false,status:{}}));
+  await page.waitForFunction(()=>!p._online);
+  assert.match(await page.locator('main').innerText(),/Impossible de joindre le RPI2DMD/);
+});

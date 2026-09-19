@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.2
+
+- Retry automatique des écritures playlist lorsque le RPI2DMD retourne HTTP 409.
+- Correction du faux statut « Hors ligne » lors d’un conflit temporaire.
+- Messages d’erreur « RPI2DMD occupé » plus précis.
+
 ## v0.4.1
 
 - Ajout d’un vrai sélecteur de type pour la playlist.

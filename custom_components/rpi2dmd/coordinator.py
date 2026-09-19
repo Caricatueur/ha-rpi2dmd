@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
@@ -12,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import RPI2DMDAuthError, RPI2DMDClient, RPI2DMDError, RPI2DMDHTTPError
+from .api import RPI2DMDAuthError, RPI2DMDClient, RPI2DMDError, async_retry_busy
 from .brightness import _validate_hourly
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
@@ -37,15 +36,12 @@ class RPI2DMDCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
-            try:
-                status = await self.api.async_get_status()
-            except RPI2DMDHTTPError as err:
-                if str(err) != "Configuration is busy" or err.status in (401, 403):
-                    raise
-                # Retry only this transient read failure, sequentially and once.
-                # A second failure reaches the normal UpdateFailed handling below.
-                await asyncio.sleep(0.5)
-                status = await self.api.async_get_status()
+            # Preserve the historical status-read policy: one retry after 0.5s.
+            status = await async_retry_busy(
+                self.api.async_get_status, attempts=2, delay=0.5,
+                is_busy=lambda err: str(err) == "Configuration is busy"
+                and err.status not in (401, 403),
+            )
             try:
                 await self.async_refresh_brightness_schedule(notify=False)
             except RPI2DMDAuthError:

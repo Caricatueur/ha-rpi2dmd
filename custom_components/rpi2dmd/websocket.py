@@ -16,7 +16,7 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .api import RPI2DMDAuthError, RPI2DMDConnectionError, RPI2DMDError
+from .api import RPI2DMDAuthError, RPI2DMDConnectionError, RPI2DMDError, RPI2DMDHTTPError
 from .brightness import _validate_hourly
 from .const import DOMAIN
 
@@ -82,6 +82,9 @@ def _send_error(connection, msg_id: int, err: Exception) -> None:
         code = "invalid_auth"
     elif isinstance(err, RPI2DMDConnectionError):
         code = "cannot_connect"
+    elif isinstance(err, RPI2DMDHTTPError) and err.status == 409:
+        connection.send_error(msg_id, "config_busy", "Le RPI2DMD est temporairement occupé. Réessayez dans quelques secondes.")
+        return
     elif isinstance(err, ValueError):
         code = "invalid_format"
     else:

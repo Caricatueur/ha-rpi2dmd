@@ -6,7 +6,7 @@ from typing import Final
 
 DOMAIN: Final = "rpi2dmd"
 NAME: Final = "RPI2DMD"
-VERSION: Final = "0.4.1"
+VERSION: Final = "0.4.2"
 DEFAULT_SCAN_INTERVAL: Final = 15
 DEFAULT_TIMEOUT: Final = 10
 API_PREFIX: Final = "/api/v1"

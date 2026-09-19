@@ -1,7 +1,7 @@
 {
   "domain": "rpi2dmd",
   "name": "RPI2DMD",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "config_flow": true,
   "documentation": "https://github.com/Caricatueur/ha-rpi2dmd",
   "issue_tracker": "https://github.com/Caricatueur/ha-rpi2dmd/issues",

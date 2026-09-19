@@ -9,7 +9,7 @@ import logging
 import re
 import time
 from ipaddress import IPv6Address
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 from urllib.parse import quote
 
@@ -46,6 +46,24 @@ class RPI2DMDHTTPError(RPI2DMDError):
     def __init__(self, status: int, message: str) -> None:
         super().__init__(message)
         self.status = status
+
+
+async def async_retry_busy(
+    operation: Callable[[], Awaitable[dict[str, Any]]],
+    *,
+    attempts: int,
+    delay: float,
+    is_busy: Callable[[RPI2DMDHTTPError], bool],
+) -> dict[str, Any]:
+    """Retry only confirmed busy HTTP responses, after closing each request."""
+    for attempt in range(attempts):
+        try:
+            return await operation()
+        except RPI2DMDHTTPError as err:
+            if not is_busy(err) or attempt == attempts - 1:
+                raise
+            await asyncio.sleep(delay)
+    raise ValueError("At least one attempt is required")
 
 
 def normalize_host(host: str, port: int | None = None) -> str:
@@ -306,21 +324,30 @@ class RPI2DMDClient:
     async def async_get_playlist(self) -> dict[str, Any]:
         return await self._request("GET", "/playlist")
 
+    async def _playlist_write(
+        self, method: str, path: str, *, body: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        # Never replay a POST after an ambiguous timeout/connection failure.
+        return await async_retry_busy(
+            lambda: self._request(method, path, body=body),
+            attempts=3, delay=1.0, is_busy=lambda err: err.status == 409,
+        )
+
     async def async_add_playlist_item(self, item: Mapping[str, Any]) -> dict[str, Any]:
-        return await self._request("POST", "/playlist/items", body=item)
+        return await self._playlist_write("POST", "/playlist/items", body=item)
 
     async def async_update_playlist_item(self, item_id: str, changes: Mapping[str, Any]) -> dict[str, Any]:
-        return await self._request("PUT", f"/playlist/items/{item_id}", body=changes)
+        return await self._playlist_write("PUT", f"/playlist/items/{item_id}", body=changes)
 
     async def async_delete_playlist_item(self, item_id: str) -> dict[str, Any]:
-        return await self._request("DELETE", f"/playlist/items/{item_id}")
+        return await self._playlist_write("DELETE", f"/playlist/items/{item_id}")
 
     async def async_move_playlist_item(self, item_id: str, index: int) -> dict[str, Any]:
-        return await self._request("POST", f"/playlist/items/{item_id}/move", body={"index": index})
+        return await self._playlist_write("POST", f"/playlist/items/{item_id}/move", body={"index": index})
 
     async def async_duplicate_playlist_item(self, item_id: str, after_id: str | None = None) -> dict[str, Any]:
         body = {} if after_id is None else {"after_id": after_id}
-        return await self._request("POST", f"/playlist/items/{item_id}/duplicate", body=body)
+        return await self._playlist_write("POST", f"/playlist/items/{item_id}/duplicate", body=body)
 
     async def async_get_gif_categories(self) -> dict[str, Any]:
         return await self._request("GET", "/gifs/categories")
