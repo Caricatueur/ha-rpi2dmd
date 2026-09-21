@@ -163,8 +163,8 @@ sans utiliser SSH ou PuTTY.
 - aucun secret n'est stocké dans ce dépôt.
 
 ## Compatibilité
-
-- RPI2DMD V2.8 : requis ; pas encore diffusé
+> [!CAUTION]
+> **RPI2DMD V2.8 : requis pour bénéficier de l’ensemble des fonctions de l’intégration ; image système en cours de diffusion.**
 - Home Assistant : custom integration installable via HACS ;
 - Raspberry Pi 4 : testé physiquement ;
 - Raspberry Pi Zero 2 W : fonctionnement RPI2DMD qualifié ;
