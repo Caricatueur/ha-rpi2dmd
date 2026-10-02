@@ -19,6 +19,8 @@ from .const import (
     LEGACY_BRIGHTNESS_SCHEDULE_MIGRATIONS,
 )
 from .coordinator import RPI2DMDCoordinator
+from .ambient import AmbientController
+from .ambient_transport import AmbientTransport
 from .panel import async_register_panel, async_unregister_panel
 from .websocket import async_register
 from .identity import (
@@ -69,6 +71,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             await async_migrate_brightness_schedule(hass, old_entry_id, new_entry_id)
         except Exception:
             _LOGGER.exception("RPI2DMD brightness schedule migration failed for %s", entry.entry_id)
+    ambient = AmbientController(hass, entry.entry_id, AmbientTransport(api, info))
+    await ambient.start()
+    hass.data[DOMAIN][entry.entry_id]["ambient"] = ambient
     return True
 
 
@@ -76,6 +81,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload one device."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
+        ambient = hass.data.get(DOMAIN, {}).get(entry.entry_id, {}).get("ambient")
+        if ambient is not None:
+            await ambient.stop()
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
         if not hass.data.get(DOMAIN):
             async_unregister_panel(hass)

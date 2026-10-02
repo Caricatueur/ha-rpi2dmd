@@ -1,7 +1,7 @@
 /* RPI2DMD HA-4 panel: dependency-free Web Component.
  * All Raspberry communication goes through hass.callWS; no token or API URL
  * is ever present in this browser code. */
-const FRONTEND_VERSION = "0.4.5";
+const FRONTEND_VERSION = "0.5.0";
 console.info(`[RPI2DMD] frontend ${FRONTEND_VERSION} loaded`);
 
 const RPI_POLISH_CSS = `
@@ -10,6 +10,7 @@ const RPI_POLISH_CSS = `
   .hero-content{position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;min-height:280px;padding:30px clamp(22px,4vw,48px)}
   .eyebrow{margin:0 0 8px;color:#67e8f9;font-size:.74rem;font-weight:800;letter-spacing:.2em}.hero h1{margin:0;color:#fff;font-size:clamp(2.1rem,5vw,4rem);letter-spacing:-.045em;line-height:1}.hero .sub{margin:.65rem 0 0;color:#cbd5e1}.hero-meta{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}.online-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid rgba(103,232,249,.35);border-radius:999px;background:rgba(8,47,73,.72);color:#cffafe;font-weight:700;font-size:.84rem;white-space:nowrap}.online-pill i{display:block;width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 13px #34d399}.online-pill.offline{border-color:rgba(248,113,113,.45);background:rgba(69,10,10,.76);color:#fecaca}.online-pill.offline i{background:#f87171;box-shadow:0 0 13px #f87171}.device{font-weight:700}
   .metric-card{position:relative;overflow:hidden}.metric-card:after{content:"";position:absolute;width:100px;height:100px;right:-38px;bottom:-42px;border-radius:50%;background:rgba(34,211,238,.1)}.metric-head{display:flex;align-items:center;gap:9px}.metric-head h2{margin:0;color:var(--secondary-text-color);font-size:.78rem;letter-spacing:.1em}.metric-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,rgba(34,211,238,.2),rgba(168,85,247,.2));color:var(--rpi-blue);font-weight:800}.card{border-radius:18px;box-shadow:0 8px 26px rgba(0,0,0,.08)}.card strong{margin:16px 0 5px;letter-spacing:-.025em}.nav{border:1px solid var(--divider-color);border-radius:10px;box-shadow:none;font-weight:650;transition:all .16s ease}.nav.active{background:linear-gradient(135deg,var(--rpi-blue),var(--rpi-purple));box-shadow:0 5px 18px rgba(59,130,246,.3)}button{border-radius:10px;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}button:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 7px 18px rgba(3,169,244,.25)}.category-card,.schedule-row{background:color-mix(in srgb,var(--secondary-background-color) 65%,transparent);border-radius:12px}.disabled-item{opacity:.58}.warning{border:1px solid rgba(245,158,11,.45);border-radius:14px;background:linear-gradient(110deg,rgba(245,158,11,.2),rgba(239,68,68,.12));font-weight:700}.success{border:1px solid rgba(34,197,94,.45);border-radius:12px;background:rgba(34,197,94,.16);color:var(--primary-text-color);font-weight:700}.brightness-control{flex:1 1 280px;min-width:min(100%,280px);margin:0!important}.brightness-line{display:flex;align-items:center;justify-content:space-between;gap:12px}.brightness-value{font-variant-numeric:tabular-nums;font-weight:700;color:var(--primary-text-color)}.brightness-slider{position:relative;width:100%;height:28px;margin:2px 0 0}.brightness-track{position:absolute;left:10px;right:10px;top:50%;height:6px;transform:translateY(-50%);border-radius:999px;background:color-mix(in srgb,var(--secondary-text-color) 35%,var(--secondary-background-color))}.brightness-fill{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--rpi-blue),var(--rpi-cyan));pointer-events:none}.brightness-input{position:absolute;inset:0;width:100%;height:28px;padding:0;margin:0;background:transparent;appearance:none;-webkit-appearance:none;cursor:pointer;z-index:1}.brightness-input::-webkit-slider-runnable-track{height:6px;background:transparent;border:0}.brightness-input::-webkit-slider-thumb{width:20px;height:20px;margin-top:-7px;border:2px solid #e0f2fe;border-radius:50%;background:var(--rpi-blue);box-shadow:0 0 0 3px rgba(3,169,244,.2),0 2px 8px rgba(0,0,0,.3);-webkit-appearance:none}.brightness-input::-moz-range-track{height:6px;background:transparent;border:0}.brightness-input::-moz-range-progress{height:6px;background:transparent}.brightness-input::-moz-range-thumb{width:20px;height:20px;border:2px solid #e0f2fe;border-radius:50%;background:var(--rpi-blue);box-shadow:0 0 0 3px rgba(3,169,244,.2),0 2px 8px rgba(0,0,0,.3)}
+  .ambient-card table{width:100%;table-layout:fixed;border-collapse:collapse}.ambient-card th,.ambient-card td{padding:6px 3px;text-align:left;overflow-wrap:anywhere}.ambient-card input[data-ambient-lux],.ambient-card input[data-ambient-value]{width:100%;min-width:0}.ambient-card td button{max-width:100%;padding:9px 6px;font-size:.85rem}
   @media(max-width:700px){main{padding:16px 12px 34px}.item,.schedule-row,.category-card{align-items:flex-start;flex-direction:column}.actions{width:100%}nav{padding-top:13px}}
 `;
 const RPI_EXACT_HERO_CSS = `
@@ -20,6 +21,18 @@ const RPI_EXACT_HERO_CSS = `
   @media(max-width:700px){.hero{height:clamp(360px,78vw,430px)}.hero-overlay{left:8px;right:8px;bottom:0px;justify-content:space-between;max-width:none;gap:8px}.hero-overlay .device{min-width:0;flex:1}.hero-overlay select{min-width:0;width:100%;flex:1}.hero-overlay .online-pill{flex-shrink:0}}
 `;
 const ICON_PICKER_CSS = `.mqtt-icon-field{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}.mqtt-icon-preview{width:24px;height:24px;object-fit:contain}.mqtt-icon-empty{color:var(--secondary-text-color)}.icon-picker-backdrop{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:18px;background:rgba(0,0,0,.5)}.icon-picker{width:min(860px,100%);max-height:90vh;overflow:auto;margin:0}.icon-filters{display:flex;gap:10px;margin:12px 0;flex-wrap:wrap}.icon-filters input{flex:1;min-width:180px}.icon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:14px}.icon-option{display:flex;flex-direction:column;align-items:center;gap:6px;min-height:122px;padding:10px;background:var(--secondary-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color)}.icon-option small{font-size:.75rem}.icon-tile{display:grid;place-items:center;width:56px;height:56px;border-radius:8px;background:var(--primary-background-color);color:var(--secondary-text-color)}.icon-tile img{max-width:100%;max-height:100%;object-fit:contain}`;
+
+const BRIGHTNESS_DESIGN_CSS = `
+.brightness-view .hero{height:108px;border-radius:18px;background-image:radial-gradient(circle,rgba(103,232,249,.16) 1px,transparent 1.5px),linear-gradient(115deg,#071523,#12233e 60%,#1d1838);background-size:8px 8px,100% 100%;border-color:rgba(125,211,252,.25);box-shadow:0 6px 22px rgba(2,8,23,.12)}.brightness-view .hero-content{min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 24px}.brightness-brand{min-width:0}.brightness-brand b{display:block;color:#e0f2fe;font-size:clamp(1.35rem,3vw,1.85rem);font-weight:850;letter-spacing:.06em;text-shadow:0 0 16px rgba(34,211,238,.25)}.brightness-brand b span{color:#67e8f9}.brightness-brand small{display:block;margin-top:7px;color:#b7c9e0;font-size:.74rem;letter-spacing:.12em}.brightness-view .hero-overlay{position:static;max-width:none;border:0;box-shadow:none;border-radius:0;padding:0;background:transparent;backdrop-filter:none;flex-shrink:0}.brightness-view .hero-overlay .device{color:#e0f2fe}.system-diagnostics{display:grid;gap:14px}.system-diagnostics p{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:12px;border-radius:10px;background:var(--secondary-background-color)}.system-diagnostics span{display:flex;align-items:center;gap:8px}.system-diagnostics b{font-size:.9rem}.system-diagnostics ha-icon{--mdc-icon-size:20px;color:var(--primary-color)}
+@media(max-width:760px){.brightness-view .hero{height:auto;min-height:146px}.brightness-view .hero-content{flex-direction:column;align-items:stretch;gap:18px;padding:18px}.brightness-view .hero-overlay{justify-content:space-between;gap:10px}.brightness-view .hero-overlay .device{min-width:0;flex:1}.brightness-view .hero-overlay select{min-width:0;width:100%}}
+.brightness-dashboard{--bd-accent:var(--primary-color,#0284c7);--bd-muted:var(--secondary-text-color,#64748b);--bd-line:var(--divider-color,#dbe4ee);--bd-surface:var(--card-background-color,#fff);--bd-soft:var(--secondary-background-color,#f1f5f9)}
+.brightness-dashboard .card{margin:0;padding:22px;border-radius:16px;box-shadow:0 4px 18px rgba(0,0,0,.04);min-width:0}.brightness-heading{display:flex;align-items:center;gap:14px;margin:26px 0 20px}.brightness-heading h1{font-size:clamp(1.8rem,4vw,2.5rem);letter-spacing:-.035em}.brightness-heading p{margin:5px 0 0}.bd-icon{display:grid;place-items:center;width:44px;height:44px;border-radius:13px;background:color-mix(in srgb,var(--bd-accent) 12%,var(--bd-surface));color:var(--bd-accent);flex-shrink:0}.bd-icon ha-icon{--mdc-icon-size:25px}.bd-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:18px}.bd-stat{display:flex;align-items:flex-start;gap:10px;padding:16px!important}.bd-stat .bd-icon{width:34px;height:34px}.bd-stat .bd-icon ha-icon{--mdc-icon-size:20px}.bd-stat p{margin:0;min-width:0;overflow-wrap:anywhere}.bd-stat small{display:block;margin-bottom:7px;font-size:.76rem}.bd-stat b{font-size:1.05rem;display:block;line-height:1.35}.bd-stat em{display:block;font-style:normal;font-size:.75rem;color:var(--bd-muted);margin-top:5px}.bd-good{color:var(--success-color,#168451)}.bd-warn{color:var(--warning-color,#b77910)}.bd-layout{align-items:start;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px}.bd-span{grid-column:1/-1}.bd-section-title{display:flex;gap:10px;align-items:center;margin-bottom:8px}.bd-section-title h2{margin:0;font-size:1.12rem}.bd-description{margin:0 0 18px;color:var(--bd-muted);font-size:.9rem;line-height:1.55}.bd-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.bd-mode{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:20px 12px;background:var(--bd-soft);color:var(--primary-text-color);border:1px solid var(--bd-line);box-shadow:none;min-width:0;min-height:146px}.bd-mode ha-icon{--mdc-icon-size:28px}.bd-mode b{font-size:.95rem}.bd-mode small{line-height:1.45;font-weight:400}.bd-mode[aria-pressed=true]{background:var(--bd-accent);color:var(--text-primary-color,#fff);border-color:var(--bd-accent)}.bd-mode[aria-pressed=true] small{color:inherit;opacity:.9}.brightness-dashboard button:focus-visible,.brightness-dashboard input:focus-visible,.brightness-dashboard select:focus-visible{outline:3px solid var(--bd-accent);outline-offset:3px}.bd-details{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px;margin:18px 0}.bd-details p{margin:0;font-size:.88rem;line-height:1.6}.bd-details b{display:block;font-size:1rem}.bd-alert{display:flex;align-items:flex-start;gap:10px;padding:13px 15px;border:1px solid color-mix(in srgb,var(--bd-accent) 25%,var(--bd-line));border-radius:10px;background:color-mix(in srgb,var(--bd-accent) 7%,var(--bd-surface));font-size:.86rem;line-height:1.5;margin-top:12px;overflow-wrap:anywhere}.bd-alert.warning{background:color-mix(in srgb,var(--warning-color,#b77910) 9%,var(--bd-surface));border-color:color-mix(in srgb,var(--warning-color,#b77910) 30%,var(--bd-line));font-weight:400}.bd-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}.bd-fields label,.bd-entity{display:flex;flex-direction:column;gap:8px;font-size:.88rem}.bd-entity select{width:100%;min-width:0}.bd-entity small{overflow-wrap:anywhere}.bd-measure{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:14px;margin-top:14px;border-radius:10px;background:var(--bd-soft)}.bd-measure output{font-weight:700;font-size:1.2rem;text-align:right}.bd-curve{width:100%;height:auto;display:block;margin:14px 0;color:var(--bd-accent)}.bd-curve text{fill:var(--bd-muted);font:11px sans-serif}.bd-curve line{stroke:var(--bd-line)}.ambient-card table{border:1px solid var(--bd-line);border-radius:10px;overflow:hidden}.ambient-card th{background:var(--bd-soft);font-size:.8rem}.ambient-card td,.ambient-card th{padding:7px}.ambient-card tr+tr td{border-top:1px solid var(--bd-line)}.ambient-card th:last-child{width:72px}.ambient-card td button{background:color-mix(in srgb,var(--error-color,#db3545) 9%,var(--bd-surface));color:var(--error-color,#db3545);width:42px;min-height:40px}.ambient-card td button ha-icon{--mdc-icon-size:18px}.bd-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}.bd-actions button{min-height:42px}.bd-secondary{background:var(--bd-soft);color:var(--bd-accent);border:1px solid var(--bd-line)}.bd-schedule .schedule-list{grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}.bd-schedule .schedule-row{display:flex;flex-direction:column;align-items:stretch;padding:0;gap:0;overflow:hidden;background:var(--bd-soft)}.bd-schedule [data-schedule-hour]{font-size:.7rem;text-align:center;padding:8px 2px;color:var(--bd-accent);background:color-mix(in srgb,var(--bd-accent) 9%,var(--bd-surface));font-weight:700}.bd-schedule .schedule-row label{display:flex;gap:4px;padding:7px;align-items:center}.bd-schedule input{width:100%;min-width:0;padding:8px 3px;text-align:center;font-variant-numeric:tabular-nums}.bd-schedule .schedule-row.current{border-color:var(--bd-accent)}.bd-visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}#ambient-error:not(:empty){padding:12px;border-radius:9px;background:color-mix(in srgb,var(--error-color,#db3545) 10%,var(--bd-surface));color:var(--error-color,#db3545)}
+.bd-summary.bd-ha-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:1100px){.bd-summary{grid-template-columns:repeat(3,minmax(0,1fr))}.bd-schedule .schedule-list{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:760px){.bd-layout{grid-template-columns:1fr}.bd-span{grid-column:auto}.brightness-dashboard .card{padding:18px}.bd-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.bd-stat{padding:12px!important}.bd-schedule .schedule-list{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media(max-width:480px){.bd-modes{gap:6px}.bd-mode{padding:14px 6px;min-height:152px}.bd-mode b{font-size:.8rem}.bd-mode small{font-size:.73rem}.bd-details{gap:14px}.bd-fields{grid-template-columns:1fr}.bd-schedule .schedule-list{grid-template-columns:repeat(4,minmax(0,1fr))}.bd-measure{flex-wrap:wrap}.bd-stat .bd-icon{display:none}.bd-actions button{flex:1 1 140px}}
+`;
+
 class Rpi2dmdPanel extends HTMLElement {
   constructor() {
     super();
@@ -71,6 +84,7 @@ class Rpi2dmdPanel extends HTMLElement {
 
   set hass(value) {
     this._hass = value;
+    this._updateAmbientMeasure();
     if (!this._timer) {
       this._loadDevices();
       this._timer = setInterval(() => this._refreshStatus(), 15000);
@@ -121,6 +135,11 @@ class Rpi2dmdPanel extends HTMLElement {
         this._clearRuntimeData();
         this._error = "Impossible de joindre le RPI2DMD. Les données temps réel sont temporairement indisponibles.";
       } else this._clearError();
+      if (this._online && this._section === "brightness" && this._ambient) {
+        const live = await this._ws("rpi2dmd/brightness/ambient/get");
+        if (entry !== this._entry || requestId !== this._statusRequestId) return;
+        this._ambient = this._ambientMerge(live.ambient);
+      }
       this._render();
       if (this._online && !wasOnline && this._section !== "dashboard") await this._loadSection(this._section);
     } catch (err) {
@@ -130,7 +149,7 @@ class Rpi2dmdPanel extends HTMLElement {
       this._showError(err, "Impossible de joindre le RPI2DMD. Les données temps réel sont temporairement indisponibles.");
     }
   }
-  _clearRuntimeData() { this._closeIconPicker(); ++this._sectionRequestId; this._playlistRequest=null; this._status=null; this._display=null; this._playlist=null; this._mqtt=null; this._weather=null; this._gifs=null; this._gifCategories=null; }
+  _clearRuntimeData() { this._ambient=null; this._systemBrightness=null; this._closeIconPicker(); ++this._sectionRequestId; this._playlistRequest=null; this._status=null; this._display=null; this._playlist=null; this._mqtt=null; this._weather=null; this._gifs=null; this._gifCategories=null; }
   _playlistLoading() {
     return this._playlistRequest?.entry === this._entry && this._playlistRequest?.requestId === this._sectionRequestId;
   }
@@ -159,6 +178,7 @@ class Rpi2dmdPanel extends HTMLElement {
     let gifs;
     let gifCategories;
     let brightnessSchedule;
+    let ambient;
     let system;
     try {
       if (section === "display") display = (await this._ws("rpi2dmd/display/get")).display;
@@ -169,7 +189,7 @@ class Rpi2dmdPanel extends HTMLElement {
         gifs = (await this._ws("rpi2dmd/gifs/list", { limit: 100 })).gifs;
         gifCategories = (await this._ws("rpi2dmd/gifs/categories")).categories;
       }
-      if (section === "brightness") { const raw=(await this._ws("rpi2dmd/brightness/schedule/get")).schedule || {}; brightnessSchedule = raw.points ? raw : { enabled: true, points: Array.isArray(raw)?raw:(raw.schedule||[]) }; }
+      if (section === "brightness") { const raw=(await this._ws("rpi2dmd/brightness/schedule/get")).schedule || {}; brightnessSchedule = raw.points ? raw : { enabled: true, points: Array.isArray(raw)?raw:(raw.schedule||[]) }; ambient=(await this._ws("rpi2dmd/brightness/ambient/get")).ambient; }
       if (section === "system") system = (await this._ws("rpi2dmd/system")).system;
       if (entry !== this._entry || requestId !== this._sectionRequestId || this._section !== section) return;
       if (section === "display" && displayState === this._displayWriteState() && displayRevision === displayState.revision) this._display = display;
@@ -177,8 +197,8 @@ class Rpi2dmdPanel extends HTMLElement {
       if (section === "mqtt") this._mqtt = mqtt;
       if (section === "weather") this._weather = weather;
       if (section === "gif") { this._gifs = gifs; this._gifCategories = gifCategories; }
-      if (section === "brightness") this._brightnessSchedule = brightnessSchedule;
-      if (section === "system") this._status = system;
+      if (section === "brightness") { this._brightnessSchedule = brightnessSchedule; this._ambient = ambient; this._ambientDirty = new Set(); }
+      if (section === "system") { this._status = system; this._systemBrightness = system?.brightness_control; }
       this._featureErrors[section] = "";
       if (this._online) this._clearError();
       this._render();
@@ -304,8 +324,8 @@ class Rpi2dmdPanel extends HTMLElement {
       });
       return;
     }
-    this.shadowRoot.innerHTML = `<style>${this._css()}${RPI_POLISH_CSS}${RPI_EXACT_HERO_CSS}${ICON_PICKER_CSS}</style><main>
-      <header class="hero"><div class="hero-content"><div class="hero-overlay"><span class="online-pill ${this._online?"":"offline"}"><i></i> ${this._online ? "En ligne" : "Hors ligne"}</span><label class="device">Appareil <select id="device">${this._devices.map(d => `<option value="${this._esc(d.entry_id)}" ${d.entry_id===this._entry?"selected":""}>${this._esc(this._deviceLabel(d))}</option>`).join("")}</select></label></div></div></header>
+    this.shadowRoot.innerHTML = `<style>${this._css()}${RPI_POLISH_CSS}${RPI_EXACT_HERO_CSS}${ICON_PICKER_CSS}${BRIGHTNESS_DESIGN_CSS}</style><main class="${this._section==="brightness"?"brightness-view":""}">
+      <header class="hero"><div class="hero-content">${this._section==="brightness"?'<div class="brightness-brand" aria-label="RPI2DMD"><b>RPI<span>2DMD</span></b><small>HOME ASSISTANT · LUMINOSITÉ</small></div>':""}<div class="hero-overlay"><span class="online-pill ${this._online?"":"offline"}"><i></i> ${this._online ? "En ligne" : "Hors ligne"}</span><label class="device">Appareil <select id="device">${this._devices.map(d => `<option value="${this._esc(d.entry_id)}" ${d.entry_id===this._entry?"selected":""}>${this._esc(this._deviceLabel(d))}</option>`).join("")}</select></label></div></div></header>
       <nav aria-label="Navigation">${["dashboard","display","brightness","playlist","mqtt","gif","weather","system","backup"].map(s => `<button class="nav ${this._section===s?"active":""}" data-nav="${s}">${this._label(s)}</button>`).join("")}</nav>
       ${this._error ? `<div class="error" role="alert">${this._esc(this._error)} <button data-action="retry">Réessayer</button></div>` : ""}
       ${this._section !== "gif" && this._featureErrors[this._section] ? `<div class="error" role="alert">${this._esc(this._featureErrors[this._section])}</div>` : ""}
@@ -313,7 +333,7 @@ class Rpi2dmdPanel extends HTMLElement {
       ${this._content()}${this._iconPickerOpen ? this._iconPickerMarkup() : ""}
       <footer class="sub"><small>Interface HA : ${FRONTEND_VERSION}</small></footer>
     </main>`;
-    this._checkHeroBanner();
+    if (this._section !== "brightness") this._checkHeroBanner();
     this._bind();
   }
   _checkHeroBanner() {
@@ -395,15 +415,118 @@ class Rpi2dmdPanel extends HTMLElement {
   _brightnessPage() {
     const s=this._brightnessSchedule||{}, points=Array.isArray(s.points)?s.points:[];
     const ready=this._online===true && points.length===24;
-    return `<section class="card"><div class="row"><h2>Planning luminosité</h2><label class="toggle">Activé <input id="schedule-enabled" type="checkbox" ${s.enabled!==false?"checked":""} ${ready?"":"disabled"}></label></div><p class="sub">Réglez la luminosité de chaque heure, de 0 à 100 %, par pas de 5 %.</p><div class="schedule-list">${Array.from({length:24},(_,hour)=>{
+    return `<div class="brightness-dashboard"><div class="brightness-heading"><span class="bd-icon"><ha-icon icon="mdi:brightness-6"></ha-icon></span><div><h1>Luminosité</h1><p class="sub">Mesurer, ajuster et confirmer la luminosité du DMD.</p></div></div>${this._ambientPage()}<section class="card bd-schedule"><div class="row"><div class="bd-section-title"><ha-icon icon="mdi:clock-outline"></ha-icon><h2>Planning horaire</h2></div><label class="toggle">Activé <input id="schedule-enabled" type="checkbox" ${s.enabled!==false?"checked":""} ${ready?"":"disabled"}></label></div><p class="sub">24 valeurs de 0 à 100 %, par pas de 5 %. Le planning est conservé dans les trois modes et assure le repli.</p><div class="schedule-list">${Array.from({length:24},(_,hour)=>{
       const time=`${String(hour).padStart(2,"0")}:00`, point=points.find(p=>this._scheduleTime(p)===time);
-      return `<div class="schedule-row"><span data-schedule-hour="${hour}">Heure : ${time}</span><label>Luminosité <input type="number" min="0" max="100" step="5" aria-label="Luminosité à ${time}" data-schedule-value="${hour}" value="${point?Number(point.value):""}" ${ready&&point?"":"disabled"}> %</label></div>`;
-    }).join("")}</div><div class="actions"><button data-action="schedule-save" ${ready?"":"disabled"}>Enregistrer</button><button data-action="schedule-apply" ${ready?"":"disabled"}>Appliquer maintenant</button></div></section>`;
+      return `<div class="schedule-row ${hour===new Date().getHours()?"current":""}"><span data-schedule-hour="${hour}">Heure : ${time}</span><label><span class="bd-visually-hidden">Luminosité</span><input type="number" min="0" max="100" step="5" aria-label="Luminosité à ${time}" data-schedule-value="${hour}" value="${point?Number(point.value):""}" ${ready&&point?"":"disabled"}> %</label></div>`;
+    }).join("")}</div><div class="bd-actions"><button data-action="schedule-save" ${ready?"":"disabled"}>Enregistrer</button><button data-action="schedule-apply" ${ready?"":"disabled"}>Appliquer maintenant</button></div><p class="bd-description" style="margin-top:14px">La sélection du mode se fait dans les cartes ci-dessus.</p></section>${this._ambient?.config?"</div>":""}</div>`;
   }
-  _systemPage() { const s=this._status||{}; return `<section class="grid cards"><section class="card"><h2>Système</h2><p>Modèle : ${this._esc(s.model)}</p><p>Hostname : ${this._esc(s.hostname)}</p><p>IP : ${this._esc((s.ip_addresses||[]).join(", "))}</p><p>Uptime : ${this._duration(s.uptime_seconds)}</p><p>CPU : ${s.cpu_temperature_c??"—"} °C</p></section><section class="card"><h2>Services</h2><p>Display : ${this._esc(s.services?.display?.state||"—")}</p><p>MQTT : ${this._esc(s.services?.mqtt?.state||"—")}</p><p>NRestarts : ${s.services?.display?.nrestarts??"—"} / ${s.services?.mqtt?.nrestarts??"—"}</p><p>Throttled : ${this._esc(s.power?.throttled_code||"—")}</p></section></section>`; }
+  _systemPage() { const s=this._status||{}, f=this._online?(this._systemBrightness||this._ambient?.firmware||{}):{}; const connection=v=>v==="connected"?"Connecté":v==="disconnected"?"Déconnecté":"Indisponible"; return `<section class="grid cards"><section class="card"><h2>Système</h2><p>Modèle : ${this._esc(s.model)}</p><p>Hostname : ${this._esc(s.hostname)}</p><p>IP : ${this._esc((s.ip_addresses||[]).join(", "))}</p><p>Uptime : ${this._duration(s.uptime_seconds)}</p><p>CPU : ${s.cpu_temperature_c??"—"} °C</p></section><section class="card"><h2>Services</h2><p>Display : ${this._esc(s.services?.display?.state||"—")}</p><p>MQTT : ${this._esc(s.services?.mqtt?.state||"—")}</p><p>NRestarts : ${s.services?.display?.nrestarts??"—"} / ${s.services?.mqtt?.nrestarts??"—"}</p><p>Throttled : ${this._esc(s.power?.throttled_code||"—")}</p></section><section class="card"><h2>Diagnostic luminosité</h2><div class="system-diagnostics"><p><span><ha-icon icon="mdi:lan"></ha-icon>Broker</span><b>${connection(f.broker)}</b></p><p><span><ha-icon icon="mdi:cog-outline"></ha-icon>Moteur</span><b>${connection(f.engine)}</b></p></div><small class="sub">Dernier état reçu du contrôleur de luminosité.</small></section></section>`; }
   _backupPage() { return `<section class="card"><h2>Sauvegarde</h2><p>Les exports sont sans secrets ni assets.</p><button data-action="export">Exporter configuration</button><label class="file">Importer configuration <input id="import" type="file" accept="application/json"></label><p id="import-result"></p></section>`; }
   _duration(sec) { if (sec == null) return "—"; const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60); return `${h} h ${m} min`; }
+  _ambientPage() {
+    const a=this._ambient;
+    if (!a?.config) return "";
+    const c=a.config;
+    const entities=Object.values(this._hass?.states||{}).filter(s=>s.entity_id.startsWith("sensor.")&&s.attributes.unit_of_measurement==="lx");
+    if(c.entity_id&&!entities.some(s=>s.entity_id===c.entity_id)) entities.push({entity_id:c.entity_id,attributes:{}});
+    const f=a.firmware||{}, sensor=f.sensor||{}, names={schedule:"Planning",local:"BH1750",ha:"Home Assistant"};
+    const mode=a.selected_mode||c.mode, source=names[a.effective_mode]||"Non confirmée";
+    const percent=v=>v==null?"—":`${v} %`, lux=v=>Number.isFinite(v)?`${Number(v.toFixed(1))} lx`:"—";
+    const applied=f.engine==="connected"&&f.pending===false?a.last_applied:null;
+    const ack=applied==null?"Non confirmée":percent(applied);
+    const metric=(icon,label,value,note="",tone="")=>`<section class="card bd-stat"><span class="bd-icon"><ha-icon icon="${icon}"></ha-icon></span><p><small>${label} </small><b class="${tone}">${this._esc(value)}</b>${note?`<em>${this._esc(note)}</em>`:""}</p></section>`;
+    return `<div id="ambient-status" class="bd-summary ${mode==="ha"?"bd-ha-summary":""}">
+      ${metric("mdi:access-point","Source active :",source,a.effective_mode!==mode?"Source de repli":"Source sélectionnée",a.effective_mode!==mode?"bd-warn":"bd-good")}
+      ${metric("mdi:brightness-6","Luminosité acquittée :",ack,f.pending?"Consigne en attente":applied==null?"Acquittement indisponible":"Confirmation du moteur",applied==null?"bd-warn":"bd-good")}
+      ${mode==="local"&&f.sensor_available&&Number.isFinite(sensor.lux)?metric("mdi:white-balance-sunny","BH1750 :",lux(sensor.lux),Number.isFinite(sensor.filtered_lux)?`Filtrés : ${lux(sensor.filtered_lux)}`:""):""}
+      ${mode!=="ha"&&f.requested!=null?metric("mdi:send-outline","Consigne Raspberry :",percent(f.requested),f.pending?"En attente d’acquittement":"Consigne courante"):""}
+      ${mode==="local"&&f.sensor_available&&sensor.target!=null?metric("mdi:chart-line","Cible BH1750 :",percent(sensor.target),"Calculée sur le Raspberry"):""}
+    </div><div class="bd-layout">
+    <section class="card bd-span"><div class="bd-section-title"><ha-icon icon="mdi:tune"></ha-icon><h2>Mode de luminosité</h2></div><p class="bd-description">Une seule source pilote le DMD. Le mode et le capteur sont enregistrés dès leur sélection.</p>
+      <label class="bd-visually-hidden">Mode <select id="ambient-mode"><option value="schedule" ${c.mode==="schedule"?"selected":""}>Planning horaire</option><option value="ha" ${c.mode==="ha"?"selected":""}>Capteur Home Assistant</option><option value="local" ${c.mode==="local"?"selected":""} ${a.firmware_required?"disabled":""}>Capteur local Raspberry — BH1750</option></select></label>
+      <div class="bd-modes" role="group" aria-label="Mode de luminosité">${[["schedule","mdi:clock-outline","Planning horaire","Valeurs programmées pour chaque heure"],["local","mdi:white-balance-sunny","Capteur BH1750","Mesure locale sur le Raspberry"],["ha","mdi:home-assistant","Home Assistant","Capteur HA, avec repli au planning"]].map(([id,icon,title,desc])=>`<button class="bd-mode" data-ambient-mode="${id}" aria-pressed="${mode===id}" ${id==="local"&&a.firmware_required?"disabled":""}><ha-icon icon="${icon}"></ha-icon><b>${title}</b><small>${desc}</small></button>`).join("")}</div>
+      ${a.firmware_required?'<div class="bd-alert warning">Firmware requis : la configuration peut être préparée, mais le panneau reste piloté par son planning horaire.</div>':""}
+    </section>
+    <section class="card ambient-card"><div class="bd-section-title"><ha-icon icon="mdi:home-assistant"></ha-icon><h2>Capteur Home Assistant</h2></div><p class="bd-description">HA mesure les lux, calcule une cible et renouvelle une consigne temporaire. Ces réglages concernent uniquement le mode Home Assistant.</p>
+      ${a.error?`<div class="bd-alert warning" role="status">${this._esc(a.error)}</div>`:""}
+      <label class="bd-entity">Entité de luminosité<select id="ambient-entity"><option value="">Sélectionner un capteur</option>${entities.map(s=>`<option value="${this._esc(s.entity_id)}" ${s.entity_id===c.entity_id?"selected":""}>${this._esc(s.attributes.friendly_name||s.entity_id)}</option>`).join("")}</select><small>${this._esc(c.entity_id||"Aucun capteur sélectionné")}</small></label>
+      <div class="bd-measure"><span>Mesure ambiante</span><output id="ambient-measure">—</output></div>
+      <div class="bd-fields"><label>Temporisation (secondes)<input id="ambient-delay" type="number" min="1" max="3600" value="${c.delay}"></label><label>Variation minimale (%)<input id="ambient-minimum" type="number" min="0" max="100" value="${c.minimum_change}"></label></div>
+      <div class="bd-section-title"><ha-icon icon="mdi:chart-line"></ha-icon><h2>Courbe lux → luminosité</h2></div><p class="bd-description">Interpolation entre les points. La courbe BH1750 reste gérée par le Raspberry.</p>${this._ambientCurve(c.points)}
+      <table><thead><tr><th scope="col">Lux</th><th scope="col">DMD (%)</th><th scope="col"><span class="bd-visually-hidden">Actions</span></th></tr></thead><tbody>${c.points.map((r,i)=>`<tr><td><input aria-label="Lux ligne ${i+1}" data-ambient-lux="${i}" type="number" min="0" step="any" value="${r.lux}"></td><td><input aria-label="Luminosité ligne ${i+1}" data-ambient-value="${i}" type="number" min="0" max="100" step="any" value="${r.value}"></td><td><button title="Supprimer le point ${i+1}" aria-label="Supprimer le point ${i+1}" data-ambient-remove="${i}"><ha-icon icon="mdi:trash-can-outline"></ha-icon></button></td></tr>`).join("")}</tbody></table>
+      <div class="bd-actions"><button id="ambient-add" class="bd-secondary">+ Ajouter un point</button><button id="ambient-save">Enregistrer la courbe et les réglages</button></div><p role="alert" id="ambient-error"></p>
+      <div class="bd-alert"><ha-icon icon="mdi:information-outline"></ha-icon><span>Si HA ou le capteur devient indisponible, le planning reprend à l’expiration de la consigne, au plus tard après 5 minutes. Le mode HA reste sélectionné.</span></div></section>`;
+  }
+  _ambientCurve(points) {
+    const valid=points.filter(p=>p.lux!==""&&p.value!==""&&Number.isFinite(Number(p.lux))&&Number.isFinite(Number(p.value))&&p.lux>=0&&p.value>=0&&p.value<=100).slice().sort((a,b)=>a.lux-b.lux);
+    if(!valid.length)return "";
+    const max=Math.max(1,...valid.map(p=>Number(p.lux))), x=l=>40+Number(l)/max*350,y=v=>135-Number(v)*1.1;
+    const coords=valid.map(p=>`${x(p.lux)},${y(p.value)}`).join(" ");
+    return `<svg class="bd-curve" viewBox="0 0 420 165" role="img" aria-label="Courbe lux vers luminosité, de 0 à ${max} lux et de 0 à 100 pour cent"><line x1="40" y1="25" x2="40" y2="135"/><line x1="40" y1="135" x2="390" y2="135"/>${[0,50,100].map(v=>`<line x1="40" y1="${y(v)}" x2="390" y2="${y(v)}" stroke-dasharray="3 4"/><text x="6" y="${y(v)+4}">${v}%</text>`).join("")}<polygon points="40,135 ${coords} ${x(valid.at(-1).lux)},135" fill="currentColor" opacity=".08"/><polyline points="${coords}" fill="none" stroke="currentColor" stroke-width="2.5"/>${valid.map(p=>`<circle cx="${x(p.lux)}" cy="${y(p.value)}" r="3.5" fill="currentColor"><title>${p.lux} lx → ${p.value} %</title></circle>`).join("")}<text x="40" y="156">0 lx</text><text x="390" y="156" text-anchor="end">${max} lx</text></svg>`;
+  }
+
+  _updateAmbientMeasure() {
+    const out=this.shadowRoot?.querySelector("#ambient-measure");
+    if(!out)return;
+    const id=this.shadowRoot.querySelector("#ambient-entity")?.value;
+    const state=this._hass?.states?.[id], raw=state?.state;
+    const valid=state?.attributes.unit_of_measurement==="lx" && raw!=null && raw.trim()!=="" && Number.isFinite(Number(raw)) && Number(raw)>=0;
+    this._ambientMeasures ??= new Map();
+    if(valid)this._ambientMeasures.set(id,Number(raw));
+    const last=this._ambientMeasures.get(id) ?? (id===this._ambient?.config.entity_id?this._ambient.last_lux:null);
+    out.textContent=valid?`${Number(raw)} lx`:`Indisponible${last!=null?` — dernière mesure : ${last} lx`:""}`;
+  }
+  _ambientRead() {
+    const root=this.shadowRoot;
+    const numeric=el=>{if(!el||el.value.trim()===""||!Number.isFinite(Number(el.value)))throw new Error("Tous les champs numériques sont requis.");return Number(el.value);};
+    const points=[...root.querySelectorAll("[data-ambient-lux]")].map(el=>({lux:numeric(el),value:numeric(root.querySelector(`[data-ambient-value="${el.dataset.ambientLux}"]`))})).sort((a,b)=>a.lux-b.lux);
+    if(!points.length||points.some((r,i)=>r.lux<0||r.value<0||r.value>100||(i>0&&r.lux===points[i-1].lux)))throw new Error("Lux uniques et positifs ou nuls ; luminosité entre 0 et 100 %.");
+    const delay=numeric(root.querySelector("#ambient-delay")), minimum_change=numeric(root.querySelector("#ambient-minimum"));
+    if(delay<1||delay>3600||minimum_change<0||minimum_change>100)throw new Error("Temporisation : 1 à 3600 s ; variation : 0 à 100 %.");
+    return {mode:root.querySelector("#ambient-mode").value,entity_id:root.querySelector("#ambient-entity").value,delay,minimum_change,points};
+  }
+  _ambientMerge(live) {
+    const config={...live.config};
+    for(const key of this._ambientDirty||[]) config[key]=this._ambient.config[key];
+    return {...live,config};
+  }
+  async _ambientSelect(changes) {
+    const entry=this._entry;
+    try {
+      const result=await this._wsWrite("rpi2dmd/brightness/ambient/update",{changes},entry);
+      if(entry!==this._entry)return;
+      this._ambient=this._ambientMerge(result.ambient);
+      this._render();
+      this._showNotice("Sélection enregistrée ; mode confirmé par le Raspberry");
+    } catch(e) {
+      if(entry!==this._entry)return;
+      try {const live=await this._ws("rpi2dmd/brightness/ambient/get");if(entry!==this._entry)return;this._ambient=this._ambientMerge(live.ambient);this._render();}catch(_){}
+      this.shadowRoot.querySelector("#ambient-error").textContent=e.message;
+    }
+  }
+  _ambientEdit(action) {
+    try {const c=this._ambientRead();action(c);(this._ambientDirty??=new Set()).add("points");this._ambient.config=c;this._render();}
+    catch(e){this.shadowRoot.querySelector("#ambient-error").textContent=e.message;}
+  }
+  async _ambientSave() {
+    const entry=this._entry;
+    try {const {points,delay,minimum_change}=this._ambientRead();const result=await this._wsWrite("rpi2dmd/brightness/ambient/update",{changes:{points,delay,minimum_change}});if(entry!==this._entry)return;this._ambient=result.ambient;this._ambientDirty=new Set();this._render();this._showNotice("Configuration luminosité enregistrée");}
+    catch(e){if(entry===this._entry)this.shadowRoot.querySelector("#ambient-error").textContent=e.message;}
+  }
   _bind() {
+    this._updateAmbientMeasure();
+    this.shadowRoot.querySelector("#ambient-entity")?.addEventListener("change",event=>{this._ambientSelect({entity_id:event.target.value});});
+    this.shadowRoot.querySelectorAll("[data-ambient-mode]").forEach(button=>button.addEventListener("click",()=>this._ambientSelect({mode:button.dataset.ambientMode})));
+    this.shadowRoot.querySelector("#ambient-mode")?.addEventListener("change",event=>{this._ambientSelect({mode:event.target.value});});
+    for(const [id,key] of [["ambient-delay","delay"],["ambient-minimum","minimum_change"]]) this.shadowRoot.querySelector(`#${id}`)?.addEventListener("input",event=>{const value=event.target.value;(this._ambientDirty??=new Set()).add(key);this._ambient.config[key]=value.trim()===""?"":Number(value);});
+    this.shadowRoot.querySelector("#ambient-save")?.addEventListener("click",()=>this._ambientSave());
+    this.shadowRoot.querySelector("#ambient-add")?.addEventListener("click",()=>this._ambientEdit(c=>c.points.push({lux:c.points.at(-1).lux+10,value:c.points.at(-1).value})));
+    this.shadowRoot.querySelectorAll("[data-ambient-remove]").forEach(el=>el.addEventListener("click",()=>this._ambientEdit(c=>{if(c.points.length<2)throw new Error("Conservez au moins une ligne.");c.points.splice(Number(el.dataset.ambientRemove),1);})));
+    this.shadowRoot.querySelectorAll("[data-ambient-lux], [data-ambient-value]").forEach(el=>{
+      el.addEventListener("input",()=>{const key=el.hasAttribute("data-ambient-lux")?"lux":"value",i=Number(el.dataset.ambientLux??el.dataset.ambientValue);(this._ambientDirty??=new Set()).add("points");this._ambient.config.points[i][key]=el.value.trim()===""?"":Number(el.value);});
+      el.addEventListener("change",()=>this._ambientEdit(()=>{}));
+    });
+
     this.shadowRoot.querySelector("[data-action=playlist-refresh]")?.addEventListener("click",()=>this._refreshPlaylist());
     this.shadowRoot.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>this._loadSection(b.dataset.nav));
     const device=this.shadowRoot.querySelector("#device"); if(device) device.onchange=()=>{this._entry=device.value; this._online=false; this._clearRuntimeData(); this._render(); this._refreshStatus();};
@@ -591,7 +714,7 @@ class Rpi2dmdPanel extends HTMLElement {
     });
   }
   async _scheduleSave(){try{const points=this._scheduleReadForm();const result=await this._wsWrite("rpi2dmd/brightness/schedule/update",{schedule:points,enabled:this._brightnessSchedule.enabled!==false});this._brightnessSchedule=result.schedule;this._clearFeatureError("brightness");await this._loadSection("brightness");this._showNotice("✓ Planning enregistré");}catch(e){this._showFeatureError("brightness",e,`✕ Impossible d'enregistrer le planning : ${e.message||"vérifiez les champs."}`);}}
-  async _scheduleApply(){try{const points=this._scheduleReadForm();const now=new Date();const current=points.find(p=>p.hour===now.getHours());if(!current)throw new Error("aucun point horaire disponible");const result=await this._wsWrite("rpi2dmd/display/update",{changes:{brightness:{schedule:[{hour:now.getHours(),value:current.value}]}}});this._display=result.display;this._clearFeatureError("brightness");await this._refreshStatus();this._showNotice(`✓ Luminosité appliquée : ${current.value} %`);}catch(e){this._showFeatureError("brightness",e,`✕ Impossible d'appliquer la luminosité : ${e.message||"réessayez."}`);}}
+  async _scheduleApply(){try{const points=this._scheduleReadForm();const now=new Date();const current=points.find(p=>p.hour===now.getHours());if(!current)throw new Error("aucun point horaire disponible");const result=await this._wsWrite("rpi2dmd/display/update",{changes:{brightness:{schedule:[{hour:now.getHours(),value:current.value}]}}});this._display=result.display;this._clearFeatureError("brightness");await this._refreshStatus();this._showNotice(`✓ Consigne de planning envoyée : ${current.value} %`);}catch(e){this._showFeatureError("brightness",e,`✕ Impossible d'appliquer la luminosité : ${e.message||"réessayez."}`);}}
   async _export(){try{const data=(await this._ws("rpi2dmd/config/export")).config;const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="rpi2dmd-config.json";a.click();URL.revokeObjectURL(a.href);}catch(e){this._showFeatureError("backup",e,"Impossible d'exporter la configuration.");}}
   async _import(file){if(!file)return;try{const doc=JSON.parse(await file.text());const validation=(await this._ws("rpi2dmd/config/import/validate",{document:doc})).validation;if(!validation.valid)throw new Error("Configuration invalide");if(confirm("Appliquer cette configuration ?")){await this._wsWrite("rpi2dmd/config/import/apply",{validation_token:validation.validation_token});this._clearFeatureError("backup");await this._refreshStatus();} }catch(e){this._showFeatureError("backup",e,"Impossible d'importer la configuration.");}}
   _css(){return `:host{display:block;color:var(--primary-text-color);background:var(--primary-background-color);min-height:100vh;font-family:var(--paper-font-body1_-_font-family, sans-serif)}main{max-width:1200px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{display:flex;align-items:center;gap:16px;min-width:0}.logo{display:block;width:min(360px,42vw);max-height:90px;object-fit:contain}h1{margin:0;font-size:2rem}h2{margin:0 0 12px;font-size:1.1rem}.sub,small{color:var(--secondary-text-color)}nav{display:flex;gap:6px;overflow:auto;padding:20px 0 12px;border-bottom:1px solid var(--divider-color)}button,select,input{font:inherit}button{border:0;border-radius:8px;padding:10px 14px;background:var(--primary-color);color:var(--text-primary-color,#fff);cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.nav{background:var(--secondary-background-color);color:var(--primary-text-color);white-space:nowrap}.nav.active{background:var(--primary-color);color:#fff}.card{background:var(--card-background-color);border:1px solid var(--divider-color);border-radius:14px;padding:18px;margin:16px 0;box-shadow:var(--ha-card-box-shadow,none)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}.cards .card{margin:0}.card strong{display:block;font-size:1.5rem;margin:8px 0}.controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center}.controls label,.card>label{display:flex;flex-direction:column;gap:6px;margin:10px 0}.toggle{flex-direction:row!important;align-items:center}.row,.item{display:flex;justify-content:space-between;align-items:center;gap:12px}.item{border-top:1px solid var(--divider-color);padding:14px 0;min-width:0}.disabled-item{opacity:.62}.playlist-add-form{margin:16px 0}.playlist-add-form h3{margin:0}.playlist-add-form label{min-width:0;max-width:100%}.playlist-state{display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}.actions{display:flex;gap:5px;flex-wrap:wrap}.actions button{padding:7px 9px}.error{background:var(--error-color);color:#fff;padding:12px;border-radius:8px;margin:14px 0}.warning{background:var(--warning-color);padding:14px;border-radius:8px;color:var(--primary-text-color)}input,select{background:var(--secondary-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);border-radius:6px;padding:9px;max-width:100%}.device{display:flex;align-items:center;gap:8px}.category-list{display:grid;gap:12px}.category-card,.schedule-row{display:flex;justify-content:space-between;align-items:center;gap:14px;border:1px solid var(--divider-color);border-radius:10px;padding:14px;min-width:0}.category-card small{display:block;margin-top:5px}.schedule-list{display:grid;gap:10px;margin:14px 0}.schedule-row label{display:flex;align-items:center;gap:8px;min-width:0}.file{display:block;margin-top:20px}@media(max-width:600px){main{padding:14px}.brand{align-items:flex-start}.logo{width:100%;max-width:300px;height:auto}header{align-items:flex-start;flex-direction:column}.device{width:100%}.device select{width:100%}.item,.schedule-row,.category-card{align-items:flex-start;flex-direction:column}.actions{width:100%}nav{padding-top:12px}}

@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.5.0
+
+- Trois modes de luminosité : planning horaire, BH1750 local et Home Assistant.
+- Courbes lux → luminosité indépendantes et configurables ; jusqu'à 10 points pour le BH1750 local.
+- Luminosité réellement acquittée par le moteur DMD.
+- Repli au planning et reprise automatique du mode Home Assistant.
+- États explicites du capteur HA : `ok`, `not_configured`, `unavailable` ; zéro lux valide.
+- Première consigne immédiate, renouvellement des valeurs stables et reprise après reconnexion.
+- Synchronisation des modes dans les deux sens et conservation des 14 entités.
+- Interfaces responsive desktop/mobile et thèmes clair/sombre.
+- Tests supplémentaires et validation d'installation neuve Home Assistant isolée.
+- Firmware compatible requis pour la commande temporaire et le statut du capteur ; les anciennes API conservent leur contrat existant.
+
+
 ## v0.4.5
 
 - Versionne l’URL du module frontend pour éviter l’utilisation d’un ancien JS.

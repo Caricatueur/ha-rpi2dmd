@@ -350,6 +350,12 @@ class RPI2DMDClient:
     async def async_update_display(self, changes: Mapping[str, Any]) -> dict[str, Any]:
         return await self._request("PUT", "/display", body=changes)
 
+    async def async_get_brightness_control(self) -> dict[str, Any]:
+        return await self._request("GET", "/display/brightness-control")
+
+    async def async_brightness_control(self, message: dict[str, Any]) -> dict[str, Any]:
+        return await self._request("PUT", "/display/brightness-control", body=message)
+
     async def async_get_brightness_schedule(self) -> dict[str, Any]:
         return await self._request("GET", "/display/brightness-schedule")
 

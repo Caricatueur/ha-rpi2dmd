@@ -119,6 +119,17 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
     api = runtime["api"]
     coordinator = runtime["coordinator"]
 
+    if command in ("rpi2dmd/brightness/ambient/get", "rpi2dmd/brightness/ambient/update"):
+        ambient = runtime["ambient"]
+        if command.endswith("/update"):
+            if "changes" in msg:
+                await ambient.configure(changes=msg["changes"])
+            else:
+                await ambient.configure(msg.get("config"))
+        else:
+            await ambient.refresh()
+        return {"entry_id": entry_id, "ambient": ambient.snapshot()}
+
     if command == "rpi2dmd/status":
         try:
             await coordinator.async_request_refresh()
@@ -204,7 +215,13 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
     if command == "rpi2dmd/weather/update":
         return {"entry_id": entry_id, "weather": _safe_weather(await api.async_update_weather(msg.get("changes", {})))}
     if command == "rpi2dmd/system":
-        return {"entry_id": entry_id, "system": await api.async_get_system()}
+        system = await api.async_get_system()
+        # Reuse the controller's RAM state; diagnostics need no extra Pi request.
+        ambient = runtime.get("ambient")
+        firmware = getattr(getattr(ambient, "transport", None), "state", None) or {}
+        return {"entry_id": entry_id, "system": {**system, "brightness_control": {
+            key: firmware.get(key) for key in ("broker", "engine")
+        }}}
     if command == "rpi2dmd/config/export":
         return {"entry_id": entry_id, "config": await api.async_get_config_export()}
     if command == "rpi2dmd/config/import/validate":
@@ -260,6 +277,8 @@ WEBSOCKET_COMMANDS = (
     "rpi2dmd/gifs/list",
     "rpi2dmd/gifs/categories",
     "rpi2dmd/gifs/categories/update",
+    "rpi2dmd/brightness/ambient/get",
+    "rpi2dmd/brightness/ambient/update",
     "rpi2dmd/brightness/schedule/get",
     "rpi2dmd/brightness/schedule/update",
     "rpi2dmd/weather/get",

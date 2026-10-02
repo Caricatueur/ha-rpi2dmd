@@ -1,0 +1,9 @@
+{
+  "version": "0.5.0",
+  "python_ha_2026_9_2": {"passed": 272, "failed": 0},
+  "python_ha_2024_12_5": {"passed": 229, "failed": 0, "excluded": ["test_ha8.py", "test_ha10_live.py"], "reason": "qualification files specific to the newer HA APIs"},
+  "javascript": {"passed": 83, "failed": 0},
+  "syntax_import_manifest_hacs_readme_links": "OK",
+  "fresh_install": "OK",
+  "production_modified": false
+}

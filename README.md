@@ -55,9 +55,9 @@ et MQTT Display.
 
 ### Luminosité
 
-- réglage manuel ;
-- planning par points horaires ;
-- activation, désactivation et application immédiate du planning.
+- trois modes : planning horaire, BH1750 local et capteur Home Assistant ;
+- courbes lux → luminosité indépendantes ;
+- luminosité acquittée et repli automatique au planning.
 
 ### Playlist
 
@@ -96,6 +96,90 @@ Le mot de passe existant n'est jamais affiché.
 
 Le panel propose l'export et l'import de configuration selon les capacités
 de l'API. Les secrets système et les assets ne sont pas inclus.
+
+## Luminosité intelligente
+
+### Planning horaire
+
+La luminosité suit les **24 valeurs configurées**, une par heure. Le planning
+reste disponible dans les trois modes et sert au repli automatique.
+
+### Capteur BH1750
+
+Le Raspberry mesure directement la lumière ambiante et calcule la luminosité
+du DMD à partir de sa courbe locale. Cette courbe est **indépendante** de celle
+configurée dans Home Assistant.
+
+### Home Assistant
+
+Choisissez une entité d'illuminance en **lx** dans la page Luminosité.
+Sa propre courbe lux → % détermine la cible, avec une temporisation et une
+variation minimale configurables. La première consigne est envoyée dès
+qu'une mesure valide est disponible, sans attendre un prochain changement
+du capteur. La consigne est renouvelée même lorsque sa valeur reste stable.
+**0 lux est une mesure valide.**
+
+### Luminosité acquittée
+
+La **Luminosité acquittée** est la valeur réellement confirmée par le moteur
+DMD : c'est la valeur de référence pour l'utilisateur. En mode Home Assistant,
+la synthèse conserve cette confirmation et masque les valeurs intermédiaires.
+
+### Repli automatique
+
+Si aucune consigne HA valide ne peut être fournie, le Raspberry utilise
+temporairement le planning après expiration du bail de la dernière consigne
+(au plus 5 minutes). Il distingue désormais **aucun capteur HA configuré** et
+**capteur HA configuré mais indisponible**. Lorsque le capteur redevient
+valide, le fonctionnement HA reprend automatiquement. Le mode choisi reste
+**Home Assistant** pendant le repli.
+
+### Home Assistant — aperçu
+
+![Luminosité Home Assistant](docs/images/brightness-home-assistant.png)
+
+## Capteur BH1750
+
+**BH1750 — luxmètre numérique I²C** : mesure de lumière ambiante en lux,
+faible consommation et interface I²C. Le code actuel utilise **`/dev/i2c-1`**
+et l'adresse **`0x23`**. Vérifiez que l'I²C est disponible avant utilisation.
+
+Branchement recommandé en **3.3 V** :
+
+| BH1750 | Raspberry Pi |
+|---|---|
+| VCC | 3.3 V |
+| GND | GND |
+| SDA | GPIO2 / pin physique 3 |
+| SCL | GPIO3 / pin physique 5 |
+
+Vérifiez les marquages et la documentation de votre module : tous les modules
+BH1750 n'ont pas la même disposition ni les mêmes composants d'alimentation.
+Le brochage est décrit dans la [documentation Raspberry Pi](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html).
+
+### Courbe locale lux → luminosité
+
+La courbe BH1750 se configure directement dans l'interface Raspberry :
+**1 à 10 points actifs**, jusqu'à 10 lignes, lux modifiables et luminosité
+DMD entière de **0 à 100 %**. Laissez les lignes inutilisées vides ; le graphique
+se met à jour à partir des points saisis, puis utilisez la sauvegarde explicite.
+Les lux doivent être strictement croissants, sans doublon.
+
+Le calcul interpole **linéairement** entre deux points et arrondit au pourcentage
+entier le plus proche (un demi-entier est arrondi vers l'entier pair). Sous le
+premier point, il conserve la luminosité de ce point ; au-dessus du dernier,
+il conserve celle du dernier. Avec un seul point, la valeur est constante.
+La sauvegarde est explicite : aucune écriture SD à chaque lecture du capteur.
+
+### Raspberry / BH1750 — aperçu
+
+![Luminosité BH1750 sur Raspberry](docs/images/brightness-rpi2dmd-bh1750.png)
+
+La gestion dynamique reste légère : aucun polling supplémentaire pour le statut
+du capteur HA, aucun nouveau timer dédié, aucune écriture SD périodique liée à
+ce statut ; le graphique est calculé côté navigateur.
+
+**La qualification physique Raspberry Pi Zero 2 W reste à effectuer.**
 
 ## Installation
 
@@ -167,13 +251,13 @@ sans utiliser SSH ou PuTTY.
 > **RPI2DMD V2.8 : requis pour bénéficier de l’ensemble des fonctions de l’intégration ; image système en cours de diffusion.**
 - Home Assistant : custom integration installable via HACS ;
 - Raspberry Pi 4 : testé physiquement ;
-- Raspberry Pi Zero 2 W : fonctionnement RPI2DMD qualifié ;
+- Raspberry Pi Zero 2 W : qualification physique de la luminosité reste à effectuer ;
 - autres modèles : non garantis, à confirmer.
 
 
 ## État du projet
 
-**Version actuelle : 0.4.5**
+**Version actuelle : 0.5.0**
 
 L’intégration RPI2DMD pour Home Assistant est désormais fonctionnelle pour les principales fonctions de configuration, de supervision et de pilotage du panneau RPI2DMD.
 
@@ -242,17 +326,17 @@ Ces optimisations réduisent fortement les rafales de requêtes vers l’API du 
 
 Depuis la version 0.4.5, le module JavaScript du panneau Home Assistant utilise une URL versionnée :
 
-`/rpi2dmd-panel.js?v=0.4.5`
+`/rpi2dmd-panel.js?v=0.5.0`
 
 Cela permet d’éviter qu’un navigateur continue à utiliser une ancienne version de l’interface après une mise à jour de l’intégration.
 
 La version du frontend réellement chargée est également visible directement dans l’interface :
 
-`Interface HA : 0.4.5`
+`Interface HA : 0.5.0`
 
 Un message de diagnostic est aussi affiché dans la console du navigateur :
 
-`[RPI2DMD] frontend 0.4.5 loaded`
+`[RPI2DMD] frontend 0.5.0 loaded`
 
 Cela facilite fortement le diagnostic des problèmes de cache entre plusieurs navigateurs ou sessions Home Assistant.
 
@@ -281,9 +365,9 @@ Cible de qualification actuelle :
 - **Raspberry Pi 4 : testé physiquement**
 - **Raspberry Pi Zero 2 W : cible de fonctionnement RPI2DMD**
 
-Voir `tests/requirements-ha8.txt` et le rapport HA8 pour les résultats de qualification.
+Voir `tests/requirements-ha8.txt` et [la validation d’installation neuve](docs/validation/fresh-install/README.md).
 
-L’action GitHub historique de référence reste basée sur Home Assistant **2024.12.5**.
+La compatibilité avec Home Assistant **2024.12.5 / Python 3.12** a également été vérifiée avec les tests applicables à cette version.
 
 Les fonctions principales de l’intégration et du panneau Home Assistant sont opérationnelles. Les améliorations actuelles portent principalement sur la robustesse des échanges avec le RPI2DMD, la gestion des accès concurrents et l’optimisation de l’interface.
 

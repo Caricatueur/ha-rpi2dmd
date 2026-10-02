@@ -224,3 +224,19 @@ async def test_hourly_update_rejects_missing_duplicate_or_invalid_values(runtime
 def test_full_remote_validation_preserves_all_hours():
     assert _validate_hourly({'schedule': list(reversed(HOURLY))}) == HOURLY
     assert len(_validate_hourly([{'hour': h, 'value': 42} for h in range(24)])) == 24
+
+
+@pytest.mark.asyncio
+async def test_system_diagnostics_reuse_controller_memory_without_new_requests(runtime):
+    hass, api, _, _ = runtime
+    api.async_get_system = AsyncMock(return_value={'hostname': 'rpi'})
+    transport = SimpleNamespace(state={'broker': 'connected', 'engine': 'disconnected'})
+    ambient = SimpleNamespace(transport=transport, refresh=AsyncMock())
+    hass.data['rpi2dmd']['one']['ambient'] = ambient
+    result = await websocket._call(hass, {'type': 'rpi2dmd/system', 'entry_id': 'one'})
+    assert result['system'] == {'hostname': 'rpi', 'brightness_control': {
+        'broker': 'connected', 'engine': 'disconnected'}}
+    api.async_get_system.assert_awaited_once()
+    api.async_get_status.assert_not_awaited()
+    ambient.refresh.assert_not_awaited()
+    assert transport.state == {'broker': 'connected', 'engine': 'disconnected'}

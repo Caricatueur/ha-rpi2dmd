@@ -452,7 +452,7 @@ test('frontend version is visible on every page and logged only once per module 
   });
   for(const section of ['dashboard','playlist','system']) {
     await page.evaluate(section=>{p._section=section;p._render();},section);
-    assert.equal(await page.locator('footer').innerText(),'Interface HA : 0.4.5');
+    assert.equal(await page.locator('footer').innerText(),'Interface HA : 0.5.0');
   }
-  assert.deepEqual(messages,['[RPI2DMD] frontend 0.4.5 loaded']);
+  assert.deepEqual(messages,['[RPI2DMD] frontend 0.5.0 loaded']);
 });

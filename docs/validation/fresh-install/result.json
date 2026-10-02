@@ -1,0 +1,20 @@
+{
+  "method": "Real HA bootstrap, real config flow and entity platforms; isolated synthetic Raspberry HTTP API",
+  "production_used": false,
+  "tests": [
+    "Clean configuration: no component, registry, cache or ambient Store before installation",
+    "Manifest 0.5.0 loaded from clean copied component",
+    "Real config flow -> loaded integration, 14 entities and one device",
+    "Second add aborts without duplicate device",
+    "Three modes work without legacy configuration; BH1750 selectable; empty HA selection falls back",
+    "New lux entity selection -> 32 lx -> 46% acknowledged",
+    "HTTP serves frontend 0.5.0; 24-hour schedule available",
+    "Fresh HTTP frontend renders three enabled modes, HA sensor selector, curve and schedule without cache"
+  ],
+  "ha_version": "2026.9.2",
+  "entities": 14,
+  "devices": 1,
+  "result": "OK",
+  "physical_raspberry_used": false,
+  "cleaned_up": true
+}
