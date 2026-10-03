@@ -70,24 +70,11 @@ test('failure rolls back locally; newer intent survives earlier failure',async t
   assert.equal(checked(p,'gif'),true);assert.equal(p._displayWriteState().pending.gif.value,true);
   await advance(t,1000);success(p,calls[2]);await tick();
 });
-test('stale display GET cannot overwrite a completed write',async t=>{
-  const {p,calls}=setup(t);const stale=structuredClone(p._display);
-  const loading=p._loadSection('display');await tick();
+test('old display navigation returns to dashboard without a display GET',async t=>{
+  const {p,calls}=setup(t);await p._loadSection('display');
+  assert.equal(p._section,'dashboard');assert.equal(calls.length,0);
   p._updateDisplay({flags:{gif:false}});await advance(t,250);
-  success(p,calls[1]);await tick();calls[0].resolve({display:stale});await loading;
-  assert.equal(checked(p,'gif'),false);
-});
-test('slider input updates value/fill immediately, survives render, writes only on change',async t=>{
-  const {p,calls}=setup(t);const listeners={};
-  const bright={value:'50',min:'0',max:'100',addEventListener:(n,fn)=>listeners[n]=fn};
-  const output={},fill={style:{}};
-  p.shadowRoot={querySelectorAll:()=>[],querySelector:sel=>({'#brightness':bright,'#brightness-value':output,'#brightness-fill':fill}[sel])};
-  p._bind();bright.value='80';listeners.input();
-  assert.equal(output.textContent,'80 %');assert.equal(fill.style.width,'80%');
-  p._render();assert.match(p.html,/id="brightness" value="80"/);assert.equal(calls.length,0);
-  bright.onchange({isTrusted:true});assert.equal(p._brightness(),80);
-  await advance(t,250);assert.equal(calls.length,1);success(p,calls[0]);await tick();
-  assert.equal(p._brightness(),80);
+  success(p,calls[0]);await tick();assert.equal(checked(p,'gif'),false);
 });
 test('queued writes remain bound to original device',async t=>{
   const {p,calls}=setup(t);p._updateDisplay({flags:{gif:false}});
@@ -109,7 +96,7 @@ test('real render and bound checkbox handler update markup before any API write'
   p.shadowRoot={querySelectorAll:sel=>sel==='[data-flag]'?[el]:[],querySelector:()=>null};
   p._bind();const change=el.onchange;
   p._render=Object.getPrototypeOf(p)._render;p._checkHeroBanner=()=>{};
-  p._section='display';
+  p._section='dashboard';
   const start=performance.now();change({isTrusted:true,currentTarget:el});
   assert.ok(performance.now()-start<100);
   assert.doesNotMatch(p.shadowRoot.innerHTML,/data-flag="gif" checked/);

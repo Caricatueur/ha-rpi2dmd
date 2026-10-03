@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.1
+
+- Suppression de l’onglet Affichage redondant ; les cinq contrôles rapides restent sur le Dashboard.
+- Nouveau résumé « Luminosité intelligente » : valeur réellement acquittée et contexte Planning, BH1750 ou Home Assistant.
+- Suppression du slider legacy et alertes cohérentes pour les capteurs HA absents ou indisponibles.
+- Contrôles rapides validés sur le Raspberry réel en tenant compte du délai de synchronisation HA.
+- Les 14 entités, les identifiants de l’appareil et le pairing sont conservés.
+
 ## v0.5.0
 
 - Trois modes de luminosité : planning horaire, BH1750 local et Home Assistant.

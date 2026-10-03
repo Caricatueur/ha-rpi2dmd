@@ -1,7 +1,7 @@
 /* RPI2DMD HA-4 panel: dependency-free Web Component.
  * All Raspberry communication goes through hass.callWS; no token or API URL
  * is ever present in this browser code. */
-const FRONTEND_VERSION = "0.5.0";
+const FRONTEND_VERSION = "0.5.1";
 console.info(`[RPI2DMD] frontend ${FRONTEND_VERSION} loaded`);
 
 const RPI_POLISH_CSS = `
@@ -9,7 +9,7 @@ const RPI_POLISH_CSS = `
   main{max-width:1280px;padding:28px clamp(16px,3vw,42px) 48px}
   .hero-content{position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;min-height:280px;padding:30px clamp(22px,4vw,48px)}
   .eyebrow{margin:0 0 8px;color:#67e8f9;font-size:.74rem;font-weight:800;letter-spacing:.2em}.hero h1{margin:0;color:#fff;font-size:clamp(2.1rem,5vw,4rem);letter-spacing:-.045em;line-height:1}.hero .sub{margin:.65rem 0 0;color:#cbd5e1}.hero-meta{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}.online-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid rgba(103,232,249,.35);border-radius:999px;background:rgba(8,47,73,.72);color:#cffafe;font-weight:700;font-size:.84rem;white-space:nowrap}.online-pill i{display:block;width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 13px #34d399}.online-pill.offline{border-color:rgba(248,113,113,.45);background:rgba(69,10,10,.76);color:#fecaca}.online-pill.offline i{background:#f87171;box-shadow:0 0 13px #f87171}.device{font-weight:700}
-  .metric-card{position:relative;overflow:hidden}.metric-card:after{content:"";position:absolute;width:100px;height:100px;right:-38px;bottom:-42px;border-radius:50%;background:rgba(34,211,238,.1)}.metric-head{display:flex;align-items:center;gap:9px}.metric-head h2{margin:0;color:var(--secondary-text-color);font-size:.78rem;letter-spacing:.1em}.metric-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,rgba(34,211,238,.2),rgba(168,85,247,.2));color:var(--rpi-blue);font-weight:800}.card{border-radius:18px;box-shadow:0 8px 26px rgba(0,0,0,.08)}.card strong{margin:16px 0 5px;letter-spacing:-.025em}.nav{border:1px solid var(--divider-color);border-radius:10px;box-shadow:none;font-weight:650;transition:all .16s ease}.nav.active{background:linear-gradient(135deg,var(--rpi-blue),var(--rpi-purple));box-shadow:0 5px 18px rgba(59,130,246,.3)}button{border-radius:10px;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}button:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 7px 18px rgba(3,169,244,.25)}.category-card,.schedule-row{background:color-mix(in srgb,var(--secondary-background-color) 65%,transparent);border-radius:12px}.disabled-item{opacity:.58}.warning{border:1px solid rgba(245,158,11,.45);border-radius:14px;background:linear-gradient(110deg,rgba(245,158,11,.2),rgba(239,68,68,.12));font-weight:700}.success{border:1px solid rgba(34,197,94,.45);border-radius:12px;background:rgba(34,197,94,.16);color:var(--primary-text-color);font-weight:700}.brightness-control{flex:1 1 280px;min-width:min(100%,280px);margin:0!important}.brightness-line{display:flex;align-items:center;justify-content:space-between;gap:12px}.brightness-value{font-variant-numeric:tabular-nums;font-weight:700;color:var(--primary-text-color)}.brightness-slider{position:relative;width:100%;height:28px;margin:2px 0 0}.brightness-track{position:absolute;left:10px;right:10px;top:50%;height:6px;transform:translateY(-50%);border-radius:999px;background:color-mix(in srgb,var(--secondary-text-color) 35%,var(--secondary-background-color))}.brightness-fill{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--rpi-blue),var(--rpi-cyan));pointer-events:none}.brightness-input{position:absolute;inset:0;width:100%;height:28px;padding:0;margin:0;background:transparent;appearance:none;-webkit-appearance:none;cursor:pointer;z-index:1}.brightness-input::-webkit-slider-runnable-track{height:6px;background:transparent;border:0}.brightness-input::-webkit-slider-thumb{width:20px;height:20px;margin-top:-7px;border:2px solid #e0f2fe;border-radius:50%;background:var(--rpi-blue);box-shadow:0 0 0 3px rgba(3,169,244,.2),0 2px 8px rgba(0,0,0,.3);-webkit-appearance:none}.brightness-input::-moz-range-track{height:6px;background:transparent;border:0}.brightness-input::-moz-range-progress{height:6px;background:transparent}.brightness-input::-moz-range-thumb{width:20px;height:20px;border:2px solid #e0f2fe;border-radius:50%;background:var(--rpi-blue);box-shadow:0 0 0 3px rgba(3,169,244,.2),0 2px 8px rgba(0,0,0,.3)}
+  .metric-card{position:relative;overflow:hidden}.metric-card:after{content:"";position:absolute;width:100px;height:100px;right:-38px;bottom:-42px;border-radius:50%;background:rgba(34,211,238,.1)}.metric-head{display:flex;align-items:center;gap:9px}.metric-head h2{margin:0;color:var(--secondary-text-color);font-size:.78rem;letter-spacing:.1em}.metric-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,rgba(34,211,238,.2),rgba(168,85,247,.2));color:var(--rpi-blue);font-weight:800}.card{border-radius:18px;box-shadow:0 8px 26px rgba(0,0,0,.08)}.card strong{margin:16px 0 5px;letter-spacing:-.025em}.nav{border:1px solid var(--divider-color);border-radius:10px;box-shadow:none;font-weight:650;transition:all .16s ease}.nav.active{background:linear-gradient(135deg,var(--rpi-blue),var(--rpi-purple));box-shadow:0 5px 18px rgba(59,130,246,.3)}button{border-radius:10px;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}button:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 7px 18px rgba(3,169,244,.25)}.category-card,.schedule-row{background:color-mix(in srgb,var(--secondary-background-color) 65%,transparent);border-radius:12px}.disabled-item{opacity:.58}.warning{border:1px solid rgba(245,158,11,.45);border-radius:14px;background:linear-gradient(110deg,rgba(245,158,11,.2),rgba(239,68,68,.12));font-weight:700}.success{border:1px solid rgba(34,197,94,.45);border-radius:12px;background:rgba(34,197,94,.16);color:var(--primary-text-color);font-weight:700}
   .ambient-card table{width:100%;table-layout:fixed;border-collapse:collapse}.ambient-card th,.ambient-card td{padding:6px 3px;text-align:left;overflow-wrap:anywhere}.ambient-card input[data-ambient-lux],.ambient-card input[data-ambient-value]{width:100%;min-width:0}.ambient-card td button{max-width:100%;padding:9px 6px;font-size:.85rem}
   @media(max-width:700px){main{padding:16px 12px 34px}.item,.schedule-row,.category-card{align-items:flex-start;flex-direction:column}.actions{width:100%}nav{padding-top:13px}}
 `;
@@ -131,6 +131,7 @@ class Rpi2dmdPanel extends HTMLElement {
       if (entry !== this._entry || requestId !== this._statusRequestId) return;
       this._online = result.online === true || result.available === true;
       this._status = this._online ? (result.status || {}) : null;
+      this._dashboardAmbient = this._online ? (result.ambient || null) : null;
       if (!this._online) {
         this._clearRuntimeData();
         this._error = "Impossible de joindre le RPI2DMD. Les données temps réel sont temporairement indisponibles.";
@@ -149,7 +150,7 @@ class Rpi2dmdPanel extends HTMLElement {
       this._showError(err, "Impossible de joindre le RPI2DMD. Les données temps réel sont temporairement indisponibles.");
     }
   }
-  _clearRuntimeData() { this._ambient=null; this._systemBrightness=null; this._closeIconPicker(); ++this._sectionRequestId; this._playlistRequest=null; this._status=null; this._display=null; this._playlist=null; this._mqtt=null; this._weather=null; this._gifs=null; this._gifCategories=null; }
+  _clearRuntimeData() { this._dashboardAmbient=null; this._ambient=null; this._systemBrightness=null; this._closeIconPicker(); ++this._sectionRequestId; this._playlistRequest=null; this._status=null; this._display=null; this._playlist=null; this._mqtt=null; this._weather=null; this._gifs=null; this._gifCategories=null; }
   _playlistLoading() {
     return this._playlistRequest?.entry === this._entry && this._playlistRequest?.requestId === this._sectionRequestId;
   }
@@ -159,6 +160,7 @@ class Rpi2dmdPanel extends HTMLElement {
   }
   async _loadSection(section) {
     const entry = this._entry;
+    if (section === "display") section = "dashboard"; // Compatibility with an old open view.
     const requestId = ++this._sectionRequestId;
     this._section = section;
     if (section === "playlist") this._playlistRequest = { entry, requestId };
@@ -169,9 +171,6 @@ class Rpi2dmdPanel extends HTMLElement {
       this._gifCategories = null;
     }
     this._render();
-    const displayState = this._displayWriteState();
-    const displayRevision = displayState.revision;
-    let display;
     let playlist;
     let mqtt;
     let weather;
@@ -181,7 +180,6 @@ class Rpi2dmdPanel extends HTMLElement {
     let ambient;
     let system;
     try {
-      if (section === "display") display = (await this._ws("rpi2dmd/display/get")).display;
       if (section === "playlist") playlist = (await this._ws("rpi2dmd/playlist/get")).playlist;
       if (section === "mqtt") mqtt = (await this._ws("rpi2dmd/mqtt/get")).mqtt;
       if (section === "weather") weather = (await this._ws("rpi2dmd/weather/get")).weather;
@@ -192,7 +190,6 @@ class Rpi2dmdPanel extends HTMLElement {
       if (section === "brightness") { const raw=(await this._ws("rpi2dmd/brightness/schedule/get")).schedule || {}; brightnessSchedule = raw.points ? raw : { enabled: true, points: Array.isArray(raw)?raw:(raw.schedule||[]) }; ambient=(await this._ws("rpi2dmd/brightness/ambient/get")).ambient; }
       if (section === "system") system = (await this._ws("rpi2dmd/system")).system;
       if (entry !== this._entry || requestId !== this._sectionRequestId || this._section !== section) return;
-      if (section === "display" && displayState === this._displayWriteState() && displayRevision === displayState.revision) this._display = display;
       if (section === "playlist") this._playlist = playlist;
       if (section === "mqtt") this._mqtt = mqtt;
       if (section === "weather") this._weather = weather;
@@ -326,9 +323,10 @@ class Rpi2dmdPanel extends HTMLElement {
     }
     this.shadowRoot.innerHTML = `<style>${this._css()}${RPI_POLISH_CSS}${RPI_EXACT_HERO_CSS}${ICON_PICKER_CSS}${BRIGHTNESS_DESIGN_CSS}</style><main class="${this._section==="brightness"?"brightness-view":""}">
       <header class="hero"><div class="hero-content">${this._section==="brightness"?'<div class="brightness-brand" aria-label="RPI2DMD"><b>RPI<span>2DMD</span></b><small>HOME ASSISTANT · LUMINOSITÉ</small></div>':""}<div class="hero-overlay"><span class="online-pill ${this._online?"":"offline"}"><i></i> ${this._online ? "En ligne" : "Hors ligne"}</span><label class="device">Appareil <select id="device">${this._devices.map(d => `<option value="${this._esc(d.entry_id)}" ${d.entry_id===this._entry?"selected":""}>${this._esc(this._deviceLabel(d))}</option>`).join("")}</select></label></div></div></header>
-      <nav aria-label="Navigation">${["dashboard","display","brightness","playlist","mqtt","gif","weather","system","backup"].map(s => `<button class="nav ${this._section===s?"active":""}" data-nav="${s}">${this._label(s)}</button>`).join("")}</nav>
+      <nav aria-label="Navigation">${["dashboard","brightness","playlist","mqtt","gif","weather","system","backup"].map(s => `<button class="nav ${this._section===s?"active":""}" data-nav="${s}">${this._label(s)}</button>`).join("")}</nav>
       ${this._error ? `<div class="error" role="alert">${this._esc(this._error)} <button data-action="retry">Réessayer</button></div>` : ""}
       ${this._section !== "gif" && this._featureErrors[this._section] ? `<div class="error" role="alert">${this._esc(this._featureErrors[this._section])}</div>` : ""}
+      ${this._section === "dashboard" && this._featureErrors.display ? `<div class="error" role="alert">${this._esc(this._featureErrors.display)}</div>` : ""}
       ${this._notice ? `<div class="success" role="status">${this._esc(this._notice)}</div>` : ""}
       ${this._content()}${this._iconPickerOpen ? this._iconPickerMarkup() : ""}
       <footer class="sub"><small>Interface HA : ${FRONTEND_VERSION}</small></footer>
@@ -343,7 +341,7 @@ class Rpi2dmdPanel extends HTMLElement {
       .then((response) => { if (!response.ok) throw new Error(`HTTP ${response.status}`); })
       .catch(() => console.error("RPI2DMD hero banner failed to load"));
   }
-  _label(s) { return ({dashboard:"Dashboard",display:"Affichage",brightness:"Luminosité",playlist:"Playlist",mqtt:"MQTT",gif:"GIF",weather:"Météo",system:"Système",backup:"Sauvegarde"})[s]; }
+  _label(s) { return ({dashboard:"Dashboard",brightness:"Luminosité",playlist:"Playlist",mqtt:"MQTT",gif:"GIF",weather:"Météo",system:"Système",backup:"Sauvegarde"})[s]; }
   _deviceLabel(device) {
     const name = String(device.name || "RPI2DMD").trim();
     const host = String(device.host || "").trim();
@@ -351,7 +349,6 @@ class Rpi2dmdPanel extends HTMLElement {
   }
   _content() {
     if (this._section === "dashboard") return this._dashboard();
-    if (this._section === "display") return this._displayPage();
     if (this._section === "brightness") return this._brightnessPage();
     if (this._section === "playlist") return this._playlistPage();
     if (this._section === "mqtt") return this._mqttPage();
@@ -370,12 +367,34 @@ class Rpi2dmdPanel extends HTMLElement {
     const currentType=online && screen.available!==false && typeof screen.type==="string" ? screen.type.trim() : "";
     const currentDetail=currentType ? this._esc(currentType) : currentMode!=="—" ? "Mode actuel" : "—";
     return `<section class="grid cards">${this._card("DISPLAY",online&&displayKnown?(display.service_state||"—"):"—",online&&displayKnown?(display.paused===true?"En pause":display.service_state?"Actif":"—"):"—","▣")}${this._card("MQTT",online&&mqttKnown?(mqtt.connected?"Connecté":"Déconnecté"):"—",online&&mqttKnown?(mqtt.state||"—"):"—","↯")}${this._card("TEMPÉRATURE",online&&s.cpu_temperature_c!=null?`${s.cpu_temperature_c} °C`:"—","CPU","℃")}${this._card("ALIMENTATION",online&&powerKnown?(power.undervoltage||power.undervoltage_now?"⚠ Sous-tension":"OK"):"—",online&&powerKnown?(power.throttled_code||"—"):"—","⚡")}${this._card("ÉCRAN ACTUEL",currentMode,currentDetail,"◈")}${this._card("UPTIME",online&&s.uptime_seconds!=null?this._duration(s.uptime_seconds):"—","Raspberry Pi","◷")}</section>
-      ${online&&power.undervoltage?`<p class="warning" role="alert">⚠ SOUS-TENSION DÉTECTÉE — code ${this._esc(power.throttled_code)}</p>`:""}<section class="card quick"><h2>Contrôles rapides</h2>${this._quickControls()}</section>`;
+      ${online&&power.undervoltage?`<p class="warning" role="alert">⚠ SOUS-TENSION DÉTECTÉE — code ${this._esc(power.throttled_code)}</p>`:""}<section class="card quick"><h2>Contrôles rapides</h2>${this._quickControls()}</section>${this._dashboardBrightness()}`;
   }
-  _quickControls() { const online=this._online===true, brightness=online?this._brightness():0, percentage=online?((Number(brightness)-0)/(100-0))*100:0; return `<div class="controls"><label class="brightness-control"><span class="brightness-line"><span>Luminosité</span><output class="brightness-value" id="brightness-value" for="brightness">${online?`${brightness} %`:"—"}</output></span><div class="brightness-slider"><div class="brightness-track"><div class="brightness-fill" id="brightness-fill" style="width:${percentage}%"></div></div><input class="brightness-input" type="range" min="0" max="100" step="5" id="brightness" value="${brightness}" aria-label="Luminosité" ${online?"":"disabled"}></div></label>${["clock","date","weather","gif","mqtt"].map(f=>`<label class="toggle"><input type="checkbox" data-flag="${f}" ${this._flag(f)?"checked":""} ${online?"":"disabled"}> ${this._labelFlag(f)}</label>`).join("")}</div>`; }
+  _quickControls() { const online=this._online===true; return `<div class="controls">${["clock","date","weather","gif","mqtt"].map(f=>`<label class="toggle"><input type="checkbox" data-flag="${f}" ${this._flag(f)?"checked":""} ${online?"":"disabled"}> ${this._labelFlag(f)}</label>`).join("")}</div>`; }
   _labelFlag(f) { return ({clock:"Heure",date:"Date",weather:"Météo",gif:"GIF",mqtt:"MQTT Display"})[f]; }
-  _brightness() { const state=this._displayWriteState(); if(state.draft !== null)return state.draft; const rows=(state.pending.brightness?.value ?? this._display?.brightness)?.schedule||[]; const h=new Date().getHours(); return rows.find(r=>r.hour===h)?.value ?? 0; }
-  _displayPage() { return `<section class="card"><h2>Affichage</h2><p class="sub">Les paramètres sont appliqués via l’API transactionnelle.</p>${this._quickControls()}</section>`; }
+  _dashboardBrightness() {
+    const a=this._online?this._dashboardAmbient:null, c=a?.config||{}, f=a?.firmware||{};
+    const mode=a?.selected_mode||c.mode, names={schedule:"Planning",local:"BH1750",ha:"Home Assistant"};
+    const percent=v=>Number.isFinite(v)?`${v} %`:"Non confirmée";
+    const lux=v=>Number.isFinite(v)?`${Number(v.toFixed(1))} lx`:"Indisponible";
+    const applied=f.engine==="connected"&&f.pending===false?a?.last_applied:null;
+    let state=a?"Normal":"Indisponible", alert="", context="";
+    const row=(label,value)=>`<p><span>${label}</span><b>${this._esc(value)}</b></p>`;
+    if(mode==="schedule") {
+      const hour=a.schedule_hour;
+      context=row("Planning en cours",Number.isFinite(f.schedule?.[hour])?`${f.schedule[hour]} %`:"Indisponible");
+    } else if(mode==="local") {
+      context=row("BH1750",lux(f.sensor_available?f.sensor?.lux:null));
+      if(!f.sensor_available) {state="Capteur indisponible";alert="Capteur BH1750 indisponible — utilisation du planning";}
+    } else if(mode==="ha") {
+      const sensor=this._hass?.states?.[c.entity_id];
+      context=row("Capteur HA",sensor?.attributes?.friendly_name||c.entity_id||"Aucun capteur sélectionné")+row("Mesure HA",lux(a.available?a.last_lux:null));
+      if(!c.entity_id) {state="Aucun capteur sélectionné";alert="Pas de capteur sélectionné sur HA — utilisation du planning";}
+      else if(!a.available) {state="Capteur indisponible";alert="Capteur Home Assistant indisponible — utilisation du planning";}
+    }
+    if(a?.effective_mode==="schedule"&&mode!=="schedule"&&!alert) state="Repli planning";
+    if(a&&state==="Normal"&&(f.engine!=="connected"||f.pending!==false||!Number.isFinite(applied)||a.effective_mode!==mode)) state="Confirmation indisponible";
+    return `<section class="card smart-brightness"><div class="row"><h2>Luminosité intelligente</h2><button data-nav="brightness" class="nav">Détails</button></div><div class="smart-brightness-details">${row("Mode actif",names[mode]||"Indisponible")}${row("Luminosité appliquée",percent(applied))}${row("État général",state)}${context}</div>${alert?`<p class="warning" role="alert">${this._esc(alert)}</p>`:""}</section>`;
+  }
   _itemIcon(item) { return item.icon ?? item.icon_id ?? item.logo ?? ""; }
   _playlistAddForm() {
     const d = this._playlistDraft;
@@ -531,7 +550,7 @@ class Rpi2dmdPanel extends HTMLElement {
     this.shadowRoot.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>this._loadSection(b.dataset.nav));
     const device=this.shadowRoot.querySelector("#device"); if(device) device.onchange=()=>{this._entry=device.value; this._online=false; this._clearRuntimeData(); this._render(); this._refreshStatus();};
     this.shadowRoot.querySelectorAll("[data-flag]").forEach(el=>el.onchange=(event)=>{if(!event.isTrusted)return;const input=event.currentTarget;const wanted=input.checked;this._updateDisplay({flags:{[input.dataset.flag]:wanted}});});
-    const bright=this.shadowRoot.querySelector("#brightness"); const brightValue=this.shadowRoot.querySelector("#brightness-value"); const brightFill=this.shadowRoot.querySelector("#brightness-fill"); if(bright){const updateVisual=()=>{const value=Number(bright.value); const min=Number(bright.min||0); const max=Number(bright.max||100); const percentage=((value-min)/(max-min))*100; if(brightValue) brightValue.textContent=`${value} %`; if(brightFill) brightFill.style.width=`${percentage}%`;}; updateVisual(); bright.addEventListener("input",()=>{this._displayWriteState().draft=Number(bright.value);updateVisual();}); bright.onchange=(event)=>{if(!event.isTrusted)return;this._updateDisplay({brightness:{schedule:[{hour:new Date().getHours(),value:Number(bright.value)}]}});};}
+
     this.shadowRoot.querySelector("[data-action=retry]")?.addEventListener("click",()=>this._refreshStatus());
     this.shadowRoot.querySelector("[data-action=gif-retry]")?.addEventListener("click",()=>this._loadSection("gif"));
     this.shadowRoot.querySelectorAll("[data-action=up],[data-action=down]").forEach(b=>b.onclick=()=>this._move(b.dataset.item,b.dataset.action==="up"?-1:1));
@@ -717,7 +736,7 @@ class Rpi2dmdPanel extends HTMLElement {
   async _scheduleApply(){try{const points=this._scheduleReadForm();const now=new Date();const current=points.find(p=>p.hour===now.getHours());if(!current)throw new Error("aucun point horaire disponible");const result=await this._wsWrite("rpi2dmd/display/update",{changes:{brightness:{schedule:[{hour:now.getHours(),value:current.value}]}}});this._display=result.display;this._clearFeatureError("brightness");await this._refreshStatus();this._showNotice(`✓ Consigne de planning envoyée : ${current.value} %`);}catch(e){this._showFeatureError("brightness",e,`✕ Impossible d'appliquer la luminosité : ${e.message||"réessayez."}`);}}
   async _export(){try{const data=(await this._ws("rpi2dmd/config/export")).config;const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="rpi2dmd-config.json";a.click();URL.revokeObjectURL(a.href);}catch(e){this._showFeatureError("backup",e,"Impossible d'exporter la configuration.");}}
   async _import(file){if(!file)return;try{const doc=JSON.parse(await file.text());const validation=(await this._ws("rpi2dmd/config/import/validate",{document:doc})).validation;if(!validation.valid)throw new Error("Configuration invalide");if(confirm("Appliquer cette configuration ?")){await this._wsWrite("rpi2dmd/config/import/apply",{validation_token:validation.validation_token});this._clearFeatureError("backup");await this._refreshStatus();} }catch(e){this._showFeatureError("backup",e,"Impossible d'importer la configuration.");}}
-  _css(){return `:host{display:block;color:var(--primary-text-color);background:var(--primary-background-color);min-height:100vh;font-family:var(--paper-font-body1_-_font-family, sans-serif)}main{max-width:1200px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{display:flex;align-items:center;gap:16px;min-width:0}.logo{display:block;width:min(360px,42vw);max-height:90px;object-fit:contain}h1{margin:0;font-size:2rem}h2{margin:0 0 12px;font-size:1.1rem}.sub,small{color:var(--secondary-text-color)}nav{display:flex;gap:6px;overflow:auto;padding:20px 0 12px;border-bottom:1px solid var(--divider-color)}button,select,input{font:inherit}button{border:0;border-radius:8px;padding:10px 14px;background:var(--primary-color);color:var(--text-primary-color,#fff);cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.nav{background:var(--secondary-background-color);color:var(--primary-text-color);white-space:nowrap}.nav.active{background:var(--primary-color);color:#fff}.card{background:var(--card-background-color);border:1px solid var(--divider-color);border-radius:14px;padding:18px;margin:16px 0;box-shadow:var(--ha-card-box-shadow,none)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}.cards .card{margin:0}.card strong{display:block;font-size:1.5rem;margin:8px 0}.controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center}.controls label,.card>label{display:flex;flex-direction:column;gap:6px;margin:10px 0}.toggle{flex-direction:row!important;align-items:center}.row,.item{display:flex;justify-content:space-between;align-items:center;gap:12px}.item{border-top:1px solid var(--divider-color);padding:14px 0;min-width:0}.disabled-item{opacity:.62}.playlist-add-form{margin:16px 0}.playlist-add-form h3{margin:0}.playlist-add-form label{min-width:0;max-width:100%}.playlist-state{display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}.actions{display:flex;gap:5px;flex-wrap:wrap}.actions button{padding:7px 9px}.error{background:var(--error-color);color:#fff;padding:12px;border-radius:8px;margin:14px 0}.warning{background:var(--warning-color);padding:14px;border-radius:8px;color:var(--primary-text-color)}input,select{background:var(--secondary-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);border-radius:6px;padding:9px;max-width:100%}.device{display:flex;align-items:center;gap:8px}.category-list{display:grid;gap:12px}.category-card,.schedule-row{display:flex;justify-content:space-between;align-items:center;gap:14px;border:1px solid var(--divider-color);border-radius:10px;padding:14px;min-width:0}.category-card small{display:block;margin-top:5px}.schedule-list{display:grid;gap:10px;margin:14px 0}.schedule-row label{display:flex;align-items:center;gap:8px;min-width:0}.file{display:block;margin-top:20px}@media(max-width:600px){main{padding:14px}.brand{align-items:flex-start}.logo{width:100%;max-width:300px;height:auto}header{align-items:flex-start;flex-direction:column}.device{width:100%}.device select{width:100%}.item,.schedule-row,.category-card{align-items:flex-start;flex-direction:column}.actions{width:100%}nav{padding-top:12px}}
+  _css(){return `:host{display:block;color:var(--primary-text-color);background:var(--primary-background-color);min-height:100vh;font-family:var(--paper-font-body1_-_font-family, sans-serif)}main{max-width:1200px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;align-items:center;gap:16px}.brand{display:flex;align-items:center;gap:16px;min-width:0}.logo{display:block;width:min(360px,42vw);max-height:90px;object-fit:contain}h1{margin:0;font-size:2rem}h2{margin:0 0 12px;font-size:1.1rem}.sub,small{color:var(--secondary-text-color)}nav{display:flex;gap:6px;overflow:auto;padding:20px 0 12px;border-bottom:1px solid var(--divider-color)}button,select,input{font:inherit}button{border:0;border-radius:8px;padding:10px 14px;background:var(--primary-color);color:var(--text-primary-color,#fff);cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.nav{background:var(--secondary-background-color);color:var(--primary-text-color);white-space:nowrap}.nav.active{background:var(--primary-color);color:#fff}.card{background:var(--card-background-color);border:1px solid var(--divider-color);border-radius:14px;padding:18px;margin:16px 0;box-shadow:var(--ha-card-box-shadow,none)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}.cards .card{margin:0}.card strong{display:block;font-size:1.5rem;margin:8px 0}.smart-brightness-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px 20px}.smart-brightness-details p{margin:0;overflow-wrap:anywhere}.smart-brightness-details span{display:block;color:var(--secondary-text-color);font-size:.85rem;margin-bottom:6px}.smart-brightness-details b{font-size:1.05rem}.smart-brightness .row{flex-wrap:wrap;margin-bottom:14px}.controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center}.controls label,.card>label{display:flex;flex-direction:column;gap:6px;margin:10px 0}.toggle{flex-direction:row!important;align-items:center}.row,.item{display:flex;justify-content:space-between;align-items:center;gap:12px}.item{border-top:1px solid var(--divider-color);padding:14px 0;min-width:0}.disabled-item{opacity:.62}.playlist-add-form{margin:16px 0}.playlist-add-form h3{margin:0}.playlist-add-form label{min-width:0;max-width:100%}.playlist-state{display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}.actions{display:flex;gap:5px;flex-wrap:wrap}.actions button{padding:7px 9px}.error{background:var(--error-color);color:#fff;padding:12px;border-radius:8px;margin:14px 0}.warning{background:var(--warning-color);padding:14px;border-radius:8px;color:var(--primary-text-color)}input,select{background:var(--secondary-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);border-radius:6px;padding:9px;max-width:100%}.device{display:flex;align-items:center;gap:8px}.category-list{display:grid;gap:12px}.category-card,.schedule-row{display:flex;justify-content:space-between;align-items:center;gap:14px;border:1px solid var(--divider-color);border-radius:10px;padding:14px;min-width:0}.category-card small{display:block;margin-top:5px}.schedule-list{display:grid;gap:10px;margin:14px 0}.schedule-row label{display:flex;align-items:center;gap:8px;min-width:0}.file{display:block;margin-top:20px}@media(max-width:600px){main{padding:14px}.brand{align-items:flex-start}.logo{width:100%;max-width:300px;height:auto}header{align-items:flex-start;flex-direction:column}.device{width:100%}.device select{width:100%}.item,.schedule-row,.category-card{align-items:flex-start;flex-direction:column}.actions{width:100%}nav{padding-top:12px}}
 `}
 }
 customElements.define("rpi2dmd-panel", Rpi2dmdPanel);

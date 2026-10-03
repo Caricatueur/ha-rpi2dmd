@@ -15,6 +15,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 
 from .api import RPI2DMDAuthError, RPI2DMDConnectionError, RPI2DMDError, RPI2DMDHTTPError
 from .brightness import _validate_hourly
@@ -141,6 +142,8 @@ async def _call(hass: HomeAssistant, msg: Mapping[str, Any]) -> Any:
             "online": available,
             "available": available,
             "status": coordinator.data if available else {},
+            # Cached controller state; no additional request to the Raspberry.
+            "ambient": {**runtime["ambient"].snapshot(), "schedule_hour": dt_util.now().hour} if available and runtime.get("ambient") else None,
         }
     if command == "rpi2dmd/display/get":
         return {"entry_id": entry_id, "display": await api.async_get_display()}

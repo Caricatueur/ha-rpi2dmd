@@ -257,7 +257,7 @@ sans utiliser SSH ou PuTTY.
 
 ## État du projet
 
-**Version actuelle : 0.5.0**
+**Version actuelle : 0.5.1**
 
 L’intégration RPI2DMD pour Home Assistant est désormais fonctionnelle pour les principales fonctions de configuration, de supervision et de pilotage du panneau RPI2DMD.
 
@@ -280,7 +280,7 @@ Les migrations de configuration et du planning de luminosité sont conçues pour
 Le RPI2DMD dispose d’un panneau Home Assistant dédié permettant notamment de gérer :
 
 - l’état général du panneau ;
-- l’affichage ;
+- les contrôles rapides Heure, Date, Météo, GIF et MQTT Display sur le Dashboard ;
 - la luminosité et sa programmation horaire ;
 - la playlist ;
 - les messages MQTT ;
@@ -290,6 +290,8 @@ Le RPI2DMD dispose d’un panneau Home Assistant dédié permettant notamment de
 - l’export et l’import de configuration.
 
 Les échanges avec le Raspberry Pi passent par le backend Home Assistant : les informations sensibles telles que le mot de passe MQTT ou la clé API du RPI2DMD ne sont pas envoyées directement au navigateur.
+
+Le Dashboard affiche un résumé « Luminosité intelligente » avec la valeur réellement acquittée, le contexte du mode actif et les alertes de repli HA. L’onglet Affichage redondant et le slider legacy ont été supprimés ; la page détaillée Luminosité reste disponible. Les 14 entités, les identifiants et le pairing sont conservés.
 
 ### Playlist et stabilité des modifications
 
@@ -326,17 +328,17 @@ Ces optimisations réduisent fortement les rafales de requêtes vers l’API du 
 
 Depuis la version 0.4.5, le module JavaScript du panneau Home Assistant utilise une URL versionnée :
 
-`/rpi2dmd-panel.js?v=0.5.0`
+`/rpi2dmd-panel.js?v=0.5.1`
 
 Cela permet d’éviter qu’un navigateur continue à utiliser une ancienne version de l’interface après une mise à jour de l’intégration.
 
 La version du frontend réellement chargée est également visible directement dans l’interface :
 
-`Interface HA : 0.5.0`
+`Interface HA : 0.5.1`
 
 Un message de diagnostic est aussi affiché dans la console du navigateur :
 
-`[RPI2DMD] frontend 0.5.0 loaded`
+`[RPI2DMD] frontend 0.5.1 loaded`
 
 Cela facilite fortement le diagnostic des problèmes de cache entre plusieurs navigateurs ou sessions Home Assistant.
 

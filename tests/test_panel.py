@@ -17,7 +17,7 @@ async def test_panel_uses_versioned_module_and_original_static_path():
     with patch.object(panel.panel_custom, 'async_register_panel', new_callable=AsyncMock) as register:
         await panel.async_register_panel(hass)
         assert register.call_args.kwargs['module_url'] == f'/rpi2dmd-panel.js?v={VERSION}'
-        assert register.call_args.kwargs['module_url'] == '/rpi2dmd-panel.js?v=0.5.0'
+        assert register.call_args.kwargs['module_url'] == '/rpi2dmd-panel.js?v=0.5.1'
         paths = hass.http.async_register_static_paths.call_args.args[0]
         assert len(paths) == 4
         js = paths[0]
@@ -34,7 +34,7 @@ def test_frontend_version_matches_integration_and_manifest():
     manifest = json.loads((root / 'manifest.json').read_text())
     js = (root / 'frontend' / 'rpi2dmd-panel.js').read_text()
     version = re.search(r'const FRONTEND_VERSION = "([^"]+)";', js).group(1)
-    assert version == VERSION == manifest['version'] == '0.5.0'
+    assert version == VERSION == manifest['version'] == '0.5.1'
 
 
 @pytest.mark.asyncio

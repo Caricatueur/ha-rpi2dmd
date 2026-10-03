@@ -240,3 +240,18 @@ async def test_system_diagnostics_reuse_controller_memory_without_new_requests(r
     api.async_get_status.assert_not_awaited()
     ambient.refresh.assert_not_awaited()
     assert transport.state == {'broker': 'connected', 'engine': 'disconnected'}
+
+@pytest.mark.asyncio
+async def test_dashboard_status_reuses_ambient_snapshot_without_refresh(runtime):
+    hass, api, coordinator, _ = runtime
+    snapshot = {'last_applied': 0, 'config': {'mode': 'schedule'}}
+    ambient = SimpleNamespace(snapshot=Mock(return_value=snapshot), refresh=AsyncMock())
+    hass.data['rpi2dmd']['one']['ambient'] = ambient
+    coordinator.async_request_refresh = AsyncMock()
+    result = await websocket._call(hass, {'type': 'rpi2dmd/status', 'entry_id': 'one'})
+    assert result['ambient']['last_applied'] == 0
+    assert 0 <= result['ambient']['schedule_hour'] <= 23
+    assert 'schedule_hour' not in snapshot
+    coordinator.async_request_refresh.assert_awaited_once()
+    ambient.refresh.assert_not_awaited()
+    api.async_get_status.assert_not_awaited()

@@ -29,11 +29,21 @@ test('save retains confirmed canonical response even before subsequent GET',asyn
   p._showNotice=()=>{};
   await p._scheduleSave();assert.deepEqual(p._brightnessSchedule,canonical);
 });
-test('apply now writes only the current hour and slider retains range and offline state',async()=>{
+test('apply now writes only the current hour; dashboard shows acknowledged planning without legacy slider',async()=>{
   const p=panel();p._scheduleReadForm=()=>hourly.map(p=>({...p,value:65}));
   p._wsWrite=async(type,msg)=>{assert.equal(type,'rpi2dmd/display/update');assert.deepEqual(JSON.parse(JSON.stringify(msg.changes)),{brightness:{schedule:[{hour:new Date().getHours(),value:65}]}});return {display:{}};};
   p._refreshStatus=async()=>{};p._showNotice=()=>{};
   await p._scheduleApply();assert.equal(p._featureErrors.brightness,'');
-  assert.match(p._quickControls(),/min="0" max="100" step="5"/);
-  p._online=false;assert.match(p._quickControls(),/id="brightness"[^>]*disabled/);
+  p._dashboardAmbient={selected_mode:'schedule',config:{mode:'schedule'},last_applied:35,schedule_hour:7,
+    firmware:{engine:'connected',pending:false,applied:35,requested:65,schedule:Array(24).fill(50)}};
+  const dashboard=p._dashboard();
+  assert.doesNotMatch(dashboard,/id="brightness"|type="range"|brightness-slider/);
+  assert.match(dashboard,/Luminosité intelligente/);
+  assert.match(dashboard,/Mode actif<\/span><b>Planning<\/b>/);
+  assert.match(dashboard,/Planning en cours<\/span><b>50 %<\/b>/);
+  assert.match(dashboard,/Luminosité appliquée<\/span><b>35 %<\/b>/);
+  assert.doesNotMatch(p._dashboardBrightness(),/65 %|BH1750|Mesure HA/);
+  p._online=false;
+  assert.equal((p._quickControls().match(/disabled/g)||[]).length,5);
+  assert.match(p._dashboardBrightness(),/Luminosité appliquée<\/span><b>Non confirmée<\/b>/);
 });

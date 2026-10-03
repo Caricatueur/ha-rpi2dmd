@@ -14,7 +14,7 @@ async function fixture(t, initial = true) {
   await page.evaluate(({ flags, initial }) => {
     const p = window.p = document.createElement('rpi2dmd-panel');
     document.body.append(p);
-    p._entry = 'test'; p._online = true; p._section = 'display'; p._bannerChecked = true;
+    p._entry = 'test'; p._online = true; p._section = 'dashboard'; p._bannerChecked = true;
     p._display = { flags: Object.fromEntries(flags.map(f => [f, initial])) };
     window.serverFlags = { ...p._display.flags };
     p._status = { display: { active_flags: initial ? flags : [] } };
