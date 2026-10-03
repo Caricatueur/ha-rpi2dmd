@@ -2,6 +2,7 @@ const {test,before,after}=require('node:test');
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const path=require('node:path');
+const fs=require('node:fs');
 let browser;
 before(async()=>{browser=await chromium.launch({headless:true});});
 after(async()=>{await browser?.close();});
@@ -72,5 +73,36 @@ test('dashboard light/dark at desktop and mobile widths has no overflow',async t
   },dark);
   assert.equal(await page.evaluate(()=>p.shadowRoot.querySelector('main').scrollWidth<=p.shadowRoot.querySelector('main').clientWidth),true,`${width} dark=${dark}`);
   assert.equal(await page.evaluate(()=>{const el=p.shadowRoot.querySelector('.smart-brightness');return el.scrollWidth<=el.clientWidth;}),true);
+  assert.equal(await page.locator('.smart-kpi').count(),4);
+  const columns=await page.locator('.smart-brightness-details').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
+  assert.equal(columns,width>1000?4:width>600?2:1);
+  assert.equal(await page.locator('.smart-details').isVisible(),true);
+  await page.evaluate(()=>{p._hass.states['sensor.lux'].attributes.friendly_name='Capteur de luminosité du grand salon avec un nom particulièrement long';p._render();});
+  assert.equal(await page.locator('.smart-brightness').evaluate(el=>el.scrollWidth<=el.clientWidth),true);
+  if(process.env.SMART_BRIGHTNESS_PREVIEW_DIR){
+   fs.mkdirSync(process.env.SMART_BRIGHTNESS_PREVIEW_DIR,{recursive:true});
+   await page.locator('.smart-brightness').screenshot({path:path.join(process.env.SMART_BRIGHTNESS_PREVIEW_DIR,`ha-${width}-${dark?'dark':'light'}.png`)});
+  }
+ }
+});
+
+test('four KPI cards and decorative icons retain context; header badge reflects existing state',async t=>{
+ const page=await fixture(t);
+ for(const mode of ['schedule','local','ha']){
+  await page.evaluate(mode=>setMode(mode),mode);
+  assert.equal(await page.locator('.smart-kpi').count(),4);
+  assert.equal(await page.locator('.smart-kpi-icon[aria-hidden=true] svg').count(),4);
+  assert.equal(await page.locator('.smart-status').innerText(),'Normal');
+  assert.equal(await page.locator('.smart-brightness').getAttribute('data-status'),'normal');
+ }
+ for(const [changes,status,tone] of [
+  [{effective_mode:'schedule'},'Repli planning','fallback'],
+  [{config:{mode:'ha',entity_id:''},available:false},'Aucun capteur sélectionné','fallback'],
+  [{available:false},'Capteur indisponible','unavailable'],
+  [{firmware:{engine:'connected',pending:true}},'Confirmation indisponible','waiting']
+ ]){
+  await page.evaluate(changes=>setMode('ha',changes),changes);
+  assert.equal(await page.locator('.smart-status').innerText(),status);
+  assert.equal(await page.locator('.smart-brightness').getAttribute('data-status'),tone);
  }
 });

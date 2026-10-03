@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.2
+
+- Amélioration de la lisibilité du bloc « Luminosité intelligente » : sous-titre, badge d’état, mini-cartes avec icônes et bouton Détails compact.
+- Quatre colonnes sur ordinateur, deux sur tablette, une sur mobile ; validation jusqu’à 320 px en clair et sombre.
+- Logique de luminosité, page détaillée et contrôles rapides inchangés ; aucun nouveau polling, timer ou dépendance.
+- Les 14 entités, l’identité de l’appareil et l’association Home Assistant sont conservées.
+
 ## v0.5.1
 
 - Suppression de l’onglet Affichage redondant ; les cinq contrôles rapides restent sur le Dashboard.

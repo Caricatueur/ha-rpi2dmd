@@ -46,8 +46,8 @@ async def main():
   hass=HomeAssistant(str(temp));loader.async_setup(hass)
   result=await bootstrap.async_from_config_dict({'homeassistant':{'name':'Fresh validation','latitude':0,'longitude':0,'elevation':0,'unit_system':'metric','time_zone':'UTC'},'http':{'server_host':'127.0.0.1','server_port':18123},'frontend':{},'config':{}},hass)
   assert result is hass;await hass.async_start()
-  integration=await loader.async_get_integration(hass,'rpi2dmd');assert integration.manifest['version']=='0.5.1';report['ha_version']=__import__('homeassistant.const',fromlist=['__version__']).__version__
-  report['tests'].append('Manifest 0.5.1 loaded from clean copied component')
+  integration=await loader.async_get_integration(hass,'rpi2dmd');assert integration.manifest['version']=='0.5.2';report['ha_version']=__import__('homeassistant.const',fromlist=['__version__']).__version__
+  report['tests'].append('Manifest 0.5.2 loaded from clean copied component')
   first=await hass.config_entries.flow.async_init('rpi2dmd',context={'source':'user'},data={'host':f'127.0.0.1:{port}'})
   assert first['step_id']=='pairing',first
   done=await hass.config_entries.flow.async_configure(first['flow_id'],{'pairing_code':'123456'});assert done['type']=='create_entry',done
@@ -69,10 +69,10 @@ async def main():
   assert state['source']=='ha' and state['applied']==46;report['tests'].append('New lux entity selection -> 32 lx -> 46% acknowledged')
   result=await _call(hass,{'type':'rpi2dmd/brightness/schedule/get','entry_id':entry.entry_id});assert len(result['schedule']['points'])==24
   async with ClientSession() as session:
-   async with session.get('http://127.0.0.1:18123/rpi2dmd-panel.js?v=0.5.1') as response:
-    assert response.status==200;js=await response.text();assert 'const FRONTEND_VERSION = "0.5.1"' in js
+   async with session.get('http://127.0.0.1:18123/rpi2dmd-panel.js?v=0.5.2') as response:
+    assert response.status==200;js=await response.text();assert 'const FRONTEND_VERSION = "0.5.2"' in js
     assert 'Planning horaire' in js and 'Capteur BH1750' in js and 'Home Assistant' in js
-  report['tests'].append('HTTP serves frontend 0.5.1; 24-hour schedule available')
+  report['tests'].append('HTTP serves frontend 0.5.2; 24-hour schedule available')
   payload=temp/'frontend-validation.json';payload.write_text(json.dumps(ambient.snapshot()))
   process=await asyncio.create_subprocess_exec('node',str(REPO/'tests/fresh-install-frontend.cjs'),str(payload),env=os.environ.copy(),stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
   stdout,stderr=await process.communicate();assert process.returncode==0,stderr.decode()
