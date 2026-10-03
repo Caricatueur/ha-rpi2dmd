@@ -190,7 +190,7 @@ ce statut ; le graphique est calculé côté navigateur.
 5. Aller dans **Paramètres → Appareils et services → Ajouter une intégration**.
 6. Rechercher **RPI2DMD**.
 
-Un RPI2DMD V2.8 avec son API activée est nécessaire.
+Un RPI2DMD V2.9 avec son API activée est nécessaire.
 
 ## Configuration
 
@@ -248,7 +248,7 @@ sans utiliser SSH ou PuTTY.
 
 ## Compatibilité
 > [!CAUTION]
-> **RPI2DMD V2.8 : requis pour bénéficier de l’ensemble des fonctions de l’intégration ; image système en cours de diffusion.**
+> **RPI2DMD V2.9 : requis pour bénéficier de l’ensemble des fonctions de l’intégration ; image système en cours de diffusion.**
 - Home Assistant : custom integration installable via HACS ;
 - Raspberry Pi 4 : testé physiquement ;
 - Raspberry Pi Zero 2 W : qualification physique de la luminosité reste à effectuer ;
@@ -365,7 +365,7 @@ Cible de qualification actuelle :
 - **Home Assistant Core 2026.9.2**
 - **Python 3.14.2 ou supérieur**
 > [!CAUTION]
-> **RPI2DMD V2.8 : requis pour bénéficier de l’ensemble des fonctions de l’intégration ; image système en cours de diffusion.**
+> **RPI2DMD V2.9 : requis pour bénéficier de l’ensemble des fonctions de l’intégration ; image système en cours de diffusion.**
 - **Raspberry Pi 4 : testé physiquement**
 - **Raspberry Pi Zero 2 W : cible de fonctionnement RPI2DMD**
 
